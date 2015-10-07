@@ -83,8 +83,10 @@ static void send(uint16_t addr, void *packet, size_t length)
 /*
  * Generic neighbours functions
  */
-void network_neighbours_print()
+int network_neighbours_print(int argc, char **argv)
 {
+    (void)argc;
+    (void)argv;
     int i;
     MSG("Neighbours;%u", num_neighbours);
     for (i = 0; i < MAX_NUM_NEIGHBOURS; i++) {
@@ -94,6 +96,7 @@ void network_neighbours_print()
             break; // no more neighbours
     }
     printf("\n");
+    return 0;
 }
 
 static int network_neighbour_id(uint16_t src_addr)
@@ -109,23 +112,37 @@ static int network_neighbour_id(uint16_t src_addr)
     return -1;
 }
 
+int network_set_tx_power(int argc, char **argv)
+{
+    uint32_t power = 0;
 
-void network_set_low_tx_power()
-{
-    mac_csma_init(rn_config.channel, rn_config.discovery_tx_power);
-}
-void network_set_high_tx_power()
-{
-    mac_csma_init(rn_config.channel, rn_config.communication_tx_power);
+    if (argc != 2)
+        return 1;
+
+    if (0 == strcmp("high", argv[1])) {
+        power = rn_config.communication_tx_power;
+    } else if (0 == strcmp("low", argv[1])) {
+        power = rn_config.discovery_tx_power;
+    } else {
+        ERROR("%s: Invalid power '%s', not in %s\n",
+                argv[0], argv[1], "['low', 'high']");
+        return 1;
+    }
+
+    mac_csma_init(rn_config.channel, power);
+    return 0;
 }
 
 /*
  * Neighbours discovery
  */
-void network_neighbours_discover()
+int network_neighbours_discover(int argc, char **argv)
 {
+    (void)argc;
+    (void)argv;
     uint8_t pkt = PKT_GRAPH;
     send(ADDR_BROADCAST, &pkt, 1);
+    return 0;
 }
 
 static void network_neighbours_add(uint16_t src_addr, int8_t rssi)
@@ -162,14 +179,17 @@ struct neighbours_pkt {
     uint16_t neighbours[MAX_NUM_NEIGHBOURS];
 };
 
-void network_neighbours_acknowledge()
+int network_neighbours_acknowledge(int argc, char **argv)
 {
+    (void)argc;
+    (void)argv;
     struct neighbours_pkt pkt;
 
     memset(&pkt, 0, sizeof(pkt));
     pkt.type = PKT_NEIGH;
     memcpy(&pkt.neighbours, neighbours, sizeof(neighbours));
     send(ADDR_BROADCAST, &pkt, sizeof(pkt));
+    return 0;
 }
 
 static void network_neighbours_validate(uint16_t src_addr,

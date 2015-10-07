@@ -14,17 +14,17 @@ void network_init(uint32_t channel, uint32_t discovery_tx_power,
 // Resets current neighbours
 void network_reset(void);
 
-void network_set_low_tx_power(void);
-void network_set_high_tx_power(void);
+int network_set_tx_power(int argc, char **argv);
+
 
 // Broadcast messages at low power to make you known to your neighbours
-void network_neighbours_discover(void);
+int network_neighbours_discover(int argc, char **argv);
 // Send acknowledge messages to your neighbours nodes
 // to improve the neighbours connection symmetry
-void network_neighbours_acknowledge(void);
+int network_neighbours_acknowledge(int argc, char **argv);
 
 // Print the network neighbours table
-void network_neighbours_print(void);
+int network_neighbours_print(int argc, char **argv);
 
 // Send my values to the neighbours
 void network_send_values(uint8_t should_compute, struct values *values);

@@ -12,33 +12,38 @@
 #include "iotlab_uid.h"
 #include "config.h"
 
+#include "shell.h"
 
-
-
-
-// UART callback function
-static void char_rx(handler_arg_t arg, uint8_t c);
-static void handle_cmd(handler_arg_t arg);
-
-
-static void print_values()
+static int print_values(int argc, char **argv)
 {
+    if (argc != 1)
+        return 1;
+    (void)argv;
     int i;
     MSG("Values;%u", compute_number);
     for (i = 0; i < NUM_VALUES; i++)
         printf(";%f", my_values.v[i]);
     printf("\n");
+    return 0;
 }
 
-static void print_final_value()
+static int print_final_value(int argc, char **argv)
 {
+    if (argc != 1)
+        return 1;
+    (void)argv;
     uint32_t final_value = compute_final_value();
     MSG("FinalValue;%u;%u\n", compute_number, final_value);
+    return 0;
 }
 
 
-static void compute_all_values()
+static int compute_all_values(int argc, char **argv)
 {
+    if (argc != 1)
+        return 1;
+    (void)argv;
+
     int i;
     compute_number++;
     num_neighbours = 0;
@@ -53,11 +58,14 @@ static void compute_all_values()
 
     // Reset values for next run
     memset(neighbours_values, 0, sizeof(neighbours_values));
+    return 0;
 }
 
 
-void init_values()
+int init_values(int argc, char **argv)
 {
+    (void)argc;
+    (void)argv;
     memset(neighbours_values, 0, sizeof(neighbours_values));
     compute_number = 0;
 
@@ -67,79 +75,45 @@ void init_values()
     int i;
     for (i = 0; i < NUM_VALUES; i++)
         my_values.v[i] = init_value();
+    return 0;
 }
 
-static void print_usage()
+static int send_values(int argc, char **argv)
 {
-    printf("\n\nIoT-LAB Simple Demo program\n");
-    printf("Type command\n");
-    printf("\th:\tprint this help\n");
-    printf("\n");
-    printf("\tt:\tSet low tx power\n");
-    printf("\tT:\tSet high tx power\n");
-    printf("\n");
-    printf("\ti:\tReset neighbours and init sensor value\n");
-    printf("\n");
-    printf("\tg:\tcreate connection graph for this node\n");
-    printf("\tG:\tValidate Graph with neighbours\n");
-    printf("\tp:\tprint neighbours table\n");
-    printf("\n");
-    printf("\ts:\tsend values to neighbours\n");
-    printf("\tS:\tsend values to neighbours and make them compute a new value\n");
-    printf("\n");
-    printf("\tc:\tcompute values received from all neighbours\n");
-    printf("\n");
-    printf("\tv:\tprint current node values\n");
-    printf("\tV:\tprint a calculated final int value\n");
-}
-
-static void handle_cmd(handler_arg_t arg)
-{
-    switch ((char) (uint32_t) arg) {
-        case 't':
-            network_set_low_tx_power();
+    int compute_on_rx = 0;
+    switch (argc) {
+        case 1:
             break;
-        case 'T':
-            network_set_high_tx_power();
-            break;
-
-        case 'g':
-            network_neighbours_discover();
-            break;
-        case 'G':
-            network_neighbours_acknowledge();
-            break;
-        case 'p':
-            network_neighbours_print();
-            break;
-
-        case 'i':
-            init_values();
-            break;
-        case 'c':
-            compute_all_values();
-            break;
-
-        case 's':
-            network_send_values(0, &my_values);
-            break;
-        case 'S':
-            network_send_values(1, &my_values);
-            break;
-        case 'v':
-            print_values();
-            break;
-        case 'V':
-            print_final_value();
-            break;
-        case '\n':
-            break;
-        case 'h':
+        case 2:
+            if (0 == strcmp("compute", argv[1])) {
+                compute_on_rx = 1;
+                break;
+            }
+            // ERROR
         default:
-            print_usage();
-            break;
+            ERROR("%s: invalid arguments\n", argv[0]);
+            return 1;
     }
+    network_send_values(compute_on_rx, &my_values);
+    return 0;
 }
+
+struct shell_command commands[] = {
+
+    {"tx_power", "[low|high] Set tx power", network_set_tx_power},
+    {"reset", "Reset neighbours and init sensor value", init_values},
+
+    {"graph-create", "create connection graph for this node", network_neighbours_discover},
+    {"graph-validate", "Validate Graph with neighbours", network_neighbours_acknowledge},
+    {"graph-print", "print neighbours table", network_neighbours_print},
+
+    {"send_values", "[|compute] send values to neighbours. May ask to also compute", send_values},
+    {"compute_values", "compute values received from all neighbours", compute_all_values},
+
+    {"print-values", "print current node values", print_values},
+    {"print-final-value", "print a calculated final int value", print_final_value},
+    {NULL, NULL, NULL},
+};
 
 int main()
 {
@@ -147,22 +121,13 @@ int main()
     event_init();
     soft_timer_init();
 
-    // Uart initialisation
-    uart_set_rx_handler(uart_print, char_rx, NULL);
     // Radio communication init
     network_init(CHANNEL, GRAPH_RADIO_POWER, RADIO_POWER);
     // init values at start
-    init_values();
+    init_values(0, NULL);
+
+    shell_init(commands, 0);
 
     platform_run();
     return 0;
 }
-
-
-/* Reception of a char on UART and store it in 'cmd' */
-static void char_rx(handler_arg_t arg, uint8_t c) {
-    // disable help message after receiving char
-    event_post_from_isr(EVENT_QUEUE_APPLI, handle_cmd,
-            (handler_arg_t)(uint32_t) c);
-}
-
