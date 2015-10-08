@@ -62,7 +62,7 @@ def print_graph(aggregator, **_):
 def print_poisson(aggregator, lambda_t=5, num_loop=300, **_):
     """ Print neighbours graph """
     for _ in range(0, num_loop):
-        broadcast_slow(aggregator, 'poisson-delay %d' % lambda_t, 0)
+        broadcast_slow(aggregator, 'poisson-delay %f' % lambda_t, 0)
         time.sleep(0.5)
 
 

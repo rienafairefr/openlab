@@ -60,6 +60,9 @@ def opts_parser():
     algo_group.add_argument('-t', '--tx-power', choices=TX_POWERS,
                             default='-17dBm', help='Graph transmission power')
 
+    algo_group.add_argument('--lambda', dest='lambda_t', default=5, type=float,
+                            help='Poisson clock lambda parameter')
+
     output = parser.add_argument_group(title="Output selection")
     output.add_argument('-o', '--out-dir', required=True,
                         dest='outdir', help='Output directory')
@@ -246,7 +249,12 @@ class NodeResults(object):
         """ Write the poisson delay results """
         all_measures = self.open('delay_all.csv')
         print "Write all final value to %s" % all_measures.name
+
         for node, values in self.poisson.items():
+            # Print 1/mean
+            mean = sum(values) / float(len(values))
+            print 'Poisson: %s: 1/mean == %f' % (node, 1./mean)
+            # Save values in file
             for val in values:
                 all_measures.write('%s,%f\n' % (node, val))
 
@@ -271,7 +279,7 @@ def parse():
     opts = parser.parse_args()
     opts.with_a8 = False  # HACK for the moment, required by 'select_nodes'
 
-    if (opts.algo not in ['create_graph', 'print_graph'] and
+    if (opts.algo in ['load_graph', 'syncronous', 'gossip', 'num_nodes'] and
             opts.neighbours is None):
         parser.error('neighbours not provided')
     if (opts.algo in ['syncronous', 'gossip', 'num_nodes', 'print_poisson'] and
