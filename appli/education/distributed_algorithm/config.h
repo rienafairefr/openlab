@@ -13,9 +13,6 @@
 #define MIN_RSSI           -70
 
 
-#define GRAPH_RADIO_POWER PHY_POWER_m17dBm
-#define RADIO_POWER PHY_POWER_3dBm
-
 #define MAC_PKT_LEN (PHY_MAX_TX_LENGTH - 4)
 #define MAX_NUM_NEIGHBOURS  ((MAC_PKT_LEN -2)/ sizeof(uint16_t))
 

@@ -23,6 +23,14 @@ def _neighbours(file_path):
     return neighbours
 
 
+TX_POWERS = [
+    '-17dBm', '-12dBm', '-9dBm', '-7dBm',
+    '-5dBm', '-4dBm', '-3dBm', '-2dBm',
+    '-1dBm', '0dBm', '0.7dBm', '1.3dBm',
+    '1.8dBm', '2.3dBm', '2.8dBm', '3dBm',
+]
+
+
 def opts_parser():
     """ Argument parser object """
     import argparse
@@ -48,6 +56,9 @@ def opts_parser():
 
     algo_group.add_argument('-g', '--neighbours-graph', type=_neighbours,
                             dest='neighbours', help='Neighbours csv')
+
+    algo_group.add_argument('-t', '--tx-power', choices=TX_POWERS,
+                            default='-17dBm', help='Graph transmission power')
 
     output = parser.add_argument_group(title="Output selection")
     output.add_argument('-o', '--out-dir', required=True,
@@ -262,7 +273,7 @@ def main():
                                  line_handler=results.handle_line) as aggr:
         time.sleep(2)
         # Run the algorithm
-        algorithm(aggr, num_loop=opts.num_loop, neighbours=opts.neighbours)
+        algorithm(aggr, **vars(opts))
         time.sleep(3)
 
 

@@ -8,8 +8,7 @@ extern uint16_t neighbours[MAX_NUM_NEIGHBOURS];
 
 
 // Init and resets the network layer, forgets current neighbours
-void network_init(uint32_t channel, uint32_t discovery_tx_power,
-        uint32_t communication_tx_power);
+void network_init(uint32_t channel);
 
 // Resets current neighbours
 void network_reset(void);

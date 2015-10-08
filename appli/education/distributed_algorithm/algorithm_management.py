@@ -17,7 +17,7 @@ def random_gossip_send(aggregator, message, delay=0.05):
     time.sleep(delay)
 
 
-def create_graph(aggregator, tx_power='low', **_):
+def create_graph(aggregator, tx_power='-17dBm', **_):
     """ Create network graph
 
     Reset configuration

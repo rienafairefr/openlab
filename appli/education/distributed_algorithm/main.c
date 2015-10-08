@@ -124,7 +124,7 @@ int main()
     soft_timer_init();
 
     // Radio communication init
-    network_init(CHANNEL, GRAPH_RADIO_POWER, RADIO_POWER);
+    network_init(CHANNEL);
     // init values at start
     init_values(0, NULL);
 

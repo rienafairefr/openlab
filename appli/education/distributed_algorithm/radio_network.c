@@ -12,8 +12,6 @@ uint32_t num_neighbours = 0;
 
 static struct {
     uint32_t channel;
-    uint32_t discovery_tx_power;
-    uint32_t communication_tx_power;
 } rn_config;
 
 enum packet_type {
@@ -24,24 +22,21 @@ enum packet_type {
 
 
 #define ADDR_BROADCAST 0xFFFF
+#define RADIO_POWER PHY_POWER_3dBm
 
-void network_init(uint32_t channel, uint32_t discovery_tx_power,
-        uint32_t communication_tx_power)
+void network_init(uint32_t channel)
 {
     network_reset();
 
     rn_config.channel = channel;
-    rn_config.discovery_tx_power = discovery_tx_power;
-    rn_config.communication_tx_power = communication_tx_power;
-
-    mac_csma_init(rn_config.channel, rn_config.communication_tx_power);
+    mac_csma_init(rn_config.channel, RADIO_POWER);
 }
 
 void network_reset()
 {
     memset(neighbours, 0, sizeof(neighbours));
     num_neighbours = 0;
-    mac_csma_init(rn_config.channel, rn_config.communication_tx_power);
+    mac_csma_init(rn_config.channel, RADIO_POWER);
 }
 
 struct msg_send
@@ -150,12 +145,13 @@ int network_set_tx_power(int argc, char **argv)
         return 1;
 
     if (0 == strcmp("high", argv[1])) {
-        power = rn_config.communication_tx_power;
+        power = RADIO_POWER;
     } else if (0 == strcmp("low", argv[1])) {
-        power = rn_config.discovery_tx_power;
+        power = PHY_POWER_m17dBm;
     } else if (255 != (power = parse_power_rf231(argv[1]))) {
+        DEBUG("Power == %s\n", argv[1]);
         ;  // Power read from value
-    }else {
+    } else {
         ERROR("%s: Invalid power '%s', not in %s or '%s'\n",
                 argv[0], argv[1], "['low', 'high']",
                 radio_power_rf231_str);
