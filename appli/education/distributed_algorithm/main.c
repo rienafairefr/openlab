@@ -9,6 +9,7 @@
 #include "event.h"
 #include "computing.h"
 #include "radio_network.h"
+#include "poisson_clock.h"
 #include "iotlab_uid.h"
 #include "config.h"
 
@@ -114,6 +115,8 @@ struct shell_command commands[] = {
 
     {"print-values", "print current node values", print_values},
     {"print-final-value", "print a calculated final int value", print_final_value},
+
+    {"poisson-delay", "[lambda] Get poisson clock delay with parameter lambda", poisson_delay},
     {NULL, NULL, NULL},
 };
 

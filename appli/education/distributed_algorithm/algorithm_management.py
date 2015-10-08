@@ -34,7 +34,7 @@ def create_graph(aggregator, tx_power='-17dBm', **_):
     # validate graph
     broadcast_slow(aggregator, 'tx_power high', 0)
     time.sleep(0.5)
-    broadcast_slow(aggregator, 'graph-validate')  # validate graph with neighbours
+    broadcast_slow(aggregator, 'graph-validate')  # validate neighbours
 
     # Print neighbours graph
     print_graph(aggregator)
@@ -59,6 +59,13 @@ def print_graph(aggregator, **_):
     broadcast_slow(aggregator, 'graph-print')
 
 
+def print_poisson(aggregator, lambda_t=5, num_loop=300, **_):
+    """ Print neighbours graph """
+    for _ in range(0, num_loop):
+        broadcast_slow(aggregator, 'poisson-delay %d' % lambda_t, 0)
+        time.sleep(0.5)
+
+
 def syncronous(aggregator, num_loop=0, **_):
     """ Run messages sending and all in syncronous mode """
     broadcast_slow(aggregator, 'reset values', 0)
@@ -69,6 +76,7 @@ def syncronous(aggregator, num_loop=0, **_):
         broadcast_slow(aggregator, 'compute_values', 0)
         broadcast_slow(aggregator, 'print-values', 0)
 
+
 def gossip(aggregator, num_loop=0, **_):
     """ Run messages sending and all in syncronous mode """
     broadcast_slow(aggregator, 'reset values', 0)
@@ -77,6 +85,7 @@ def gossip(aggregator, num_loop=0, **_):
     for _ in range(0, num_loop):
         random_gossip_send(aggregator, 'send_values compute')
         broadcast_slow(aggregator, 'print-values', 0)
+
 
 def num_nodes_gossip(aggregator, num_loop=0, **_):
     """ Find the number of nodes after having run in gossip """

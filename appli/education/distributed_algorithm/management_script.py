@@ -12,6 +12,7 @@ from iotlabcli.parser import common as common_parser
 
 import algorithm_management as _algos
 
+
 def _neighbours(file_path):
     """" Load neighbours graph file """
     neighbours = {}
@@ -81,6 +82,8 @@ class NodeResults(object):
         self.node_measures = {}
         self.node_finale_measures = {}
 
+        self.poisson = {}
+
         mkdir_p(self.outdir)
 
     def open(self, name, mode='w'):
@@ -117,6 +120,10 @@ class NodeResults(object):
                 'num_compute': int(num_compute),
                 'value': str(int(final_value)),
             }
+        elif 'PoissonDelay' in line:
+            # 1062;PoissonDelay;4.9169922E-1
+            node, _, delay = line.split(';')
+            self.poisson.setdefault(node, []).append(float(delay))
 
     def write_neighbours(self):
         """ Write neighbours output """
@@ -235,8 +242,15 @@ class NodeResults(object):
             all_measures.write(all_line + '\n')
         all_measures.close()
 
+    def write_poisson(self):
+        """ Write the poisson delay results """
+        all_measures = self.open('delay_all.csv')
+        print "Write all final value to %s" % all_measures.name
+        for node, values in self.poisson.items():
+            for val in values:
+                all_measures.write('%s,%f\n' % (node, val))
 
-
+        all_measures.close()
 
 
 ALGOS = {
@@ -248,7 +262,9 @@ ALGOS = {
     'gossip': (_algos.gossip, 'write_algo_results'),
     'num_nodes': (_algos.num_nodes_gossip, 'write_algo_results'),
 
+    'print_poisson': (_algos.print_poisson, 'write_poisson'),
 }
+
 
 def parse():
     parser = opts_parser()
@@ -258,7 +274,7 @@ def parse():
     if (opts.algo not in ['create_graph', 'print_graph'] and
             opts.neighbours is None):
         parser.error('neighbours not provided')
-    if (opts.algo in ['syncronous', 'gossip', 'num_nodes'] and
+    if (opts.algo in ['syncronous', 'gossip', 'num_nodes', 'print_poisson'] and
             opts.num_loop is None):
         parser.error('num_loop not provided')
 
