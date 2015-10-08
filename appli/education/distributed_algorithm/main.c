@@ -101,7 +101,7 @@ static int send_values(int argc, char **argv)
 
 struct shell_command commands[] = {
 
-    {"tx_power", "[low|high] Set tx power", network_set_tx_power},
+    {"tx_power", "[low|high|<dBm_power>] Set tx power", network_set_tx_power},
     {"reset", "[|network|values] Reset neighbours and values", init_values},
 
     {"graph-create", "create connection graph for this node", network_neighbours_discover},

@@ -4,6 +4,7 @@
 #include "soft_timer.h"
 #include "radio_network.h"
 #include "mac_csma.h"
+#include "phy_power.c.h"
 
 
 uint16_t neighbours[MAX_NUM_NEIGHBOURS] = {0};
@@ -152,9 +153,12 @@ int network_set_tx_power(int argc, char **argv)
         power = rn_config.communication_tx_power;
     } else if (0 == strcmp("low", argv[1])) {
         power = rn_config.discovery_tx_power;
-    } else {
-        ERROR("%s: Invalid power '%s', not in %s\n",
-                argv[0], argv[1], "['low', 'high']");
+    } else if (255 != (power = parse_power_rf231(argv[1]))) {
+        ;  // Power read from value
+    }else {
+        ERROR("%s: Invalid power '%s', not in %s or '%s'\n",
+                argv[0], argv[1], "['low', 'high']",
+                radio_power_rf231_str);
         return 1;
     }
 
