@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdlib.h>
 #include <stddef.h>
 #include "soft_timer.h"
 #include "radio_network.h"
@@ -83,6 +84,34 @@ static void send(uint16_t addr, void *packet, size_t length)
 /*
  * Generic neighbours functions
  */
+
+
+int network_neighbours_load(int argc, char **argv)
+{
+    if (argc <= 2)
+        return 0;
+    if (strtol(argv[1], NULL, 16) != iotlab_uid())
+        return 0;  // It's for another node
+    int num_neigh = argc -2;
+    if (num_neigh > MAX_NUM_NEIGHBOURS) {
+        ERROR("Too many neighbours: %d > %d", num_neigh, MAX_NUM_NEIGHBOURS);
+        return 1;
+    }
+
+    int i;
+    for (i = 0; i < num_neigh; i++) {
+        neighbours[i] = strtol(argv[i + 2], NULL, 16);
+        num_neighbours++;
+    }
+
+    // Should have been blanked but anyway
+    if (num_neigh < MAX_NUM_NEIGHBOURS)
+        neighbours[num_neigh] = 0;
+
+    INFO("Loaded %d neighbours\n", num_neigh);
+    return 0;
+}
+
 int network_neighbours_print(int argc, char **argv)
 {
     (void)argc;

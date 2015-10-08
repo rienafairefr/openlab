@@ -26,6 +26,9 @@ int network_neighbours_acknowledge(int argc, char **argv);
 // Print the network neighbours table
 int network_neighbours_print(int argc, char **argv);
 
+// Load the network neighbours table
+int network_neighbours_load(int argc, char **argv);
+
 // Send my values to the neighbours
 void network_send_values(uint8_t should_compute, struct values *values);
 

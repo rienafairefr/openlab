@@ -64,17 +64,18 @@ static int compute_all_values(int argc, char **argv)
 
 int init_values(int argc, char **argv)
 {
-    (void)argc;
-    (void)argv;
-    memset(neighbours_values, 0, sizeof(neighbours_values));
-    compute_number = 0;
+    int all = argc < 2;  // default
+    if (all || 0 == strcmp("network", argv[1]))
+        network_reset();
 
-    network_reset();
-
-    memset(&my_values, 0, sizeof(my_values));
-    int i;
-    for (i = 0; i < NUM_VALUES; i++)
-        my_values.v[i] = init_value();
+    if (all || 0 == strcmp("values", argv[1])) {
+        memset(neighbours_values, 0, sizeof(neighbours_values));
+        compute_number = 0;
+        memset(&my_values, 0, sizeof(my_values));
+        int i;
+        for (i = 0; i < NUM_VALUES; i++)
+            my_values.v[i] = init_value();
+    }
     return 0;
 }
 
@@ -101,11 +102,12 @@ static int send_values(int argc, char **argv)
 struct shell_command commands[] = {
 
     {"tx_power", "[low|high] Set tx power", network_set_tx_power},
-    {"reset", "Reset neighbours and init sensor value", init_values},
+    {"reset", "[|network|values] Reset neighbours and values", init_values},
 
     {"graph-create", "create connection graph for this node", network_neighbours_discover},
     {"graph-validate", "Validate Graph with neighbours", network_neighbours_acknowledge},
     {"graph-print", "print neighbours table", network_neighbours_print},
+    {"neighbours", "[node_id] [neigh] [neigh] ... Use given neighbours table", network_neighbours_load},
 
     {"send_values", "[|compute] send values to neighbours. May ask to also compute", send_values},
     {"compute_values", "compute values received from all neighbours", compute_all_values},

@@ -3,14 +3,24 @@
 
 """ Get the iotlab-uip for all experiment nodes """
 
-import sys
+import os
 import time
 import subprocess
 
 from iotlabaggregator import serial
 from iotlabcli.parser import common as common_parser
+import json
 
 import algorithm_management
+
+def _neighbours(file_path):
+    """" Load neighbours graph file """
+    neighbours = {}
+    with open(file_path) as neigh_file:
+        for line in neigh_file:
+            node, neighs = line.strip().split(':')
+            neighbours[node] = neighs.split(';')
+    return neighbours
 
 
 def opts_parser():
@@ -25,33 +35,48 @@ def opts_parser():
 
     nodes_group.add_argument('-i', '--id', dest='experiment_id', type=int,
                              help='experiment id submission')
+    nodes_group.add_argument('-l', '--list', dest='nodes_list',
+                             type=common_parser.nodes_list_from_str,
+                             help='nodes list, may be given multiple times')
 
-    nodes_group.add_argument(
-        '-l', '--list', type=common_parser.nodes_list_from_str,
-        dest='nodes_list', help='nodes list, may be given multiple times')
+    algo_group = parser.add_argument_group(title="Algorithm selection")
 
-    nodes_group.add_argument('-a', '--algo', default='syncronous',
-                             choices=ALGOS.keys(), help='Algorithm to run')
+    algo_group.add_argument('-a', '--algo', default='syncronous',
+                            choices=ALGOS.keys(), help='Algorithm to run')
+    algo_group.add_argument('-n', '--num-loop', type=int,
+                            dest='num_loop', help='number_of_loops_to_run')
 
-    nodes_group.add_argument(
-        '-n', '--num-loop', type=int, required=True,
-        dest='num_loop', help='number_of_loops_to_run')
+    algo_group.add_argument('-g', '--neighbours-graph', type=_neighbours,
+                            dest='neighbours', help='Neighbours csv')
 
-    nodes_group.add_argument(
-        '-o', '--out-file', required=True,
-        dest='outfile', help='Files where to output traces')
+    output = parser.add_argument_group(title="Output selection")
+    output.add_argument('-o', '--out-dir', required=True,
+                        dest='outdir', help='Output directory')
 
     return parser
 
 
+def mkdir_p(outdir):
+    """ mkdir -p `outdir` """
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+
+
 class NodeResults(object):
 
-    def __init__(self, outfilename):
-        self.outfilename = outfilename
+    def __init__(self, outdir):
+        self.outdir = outdir
         self.neighbours = {}
 
         self.node_measures = {}
         self.node_finale_measures = {}
+
+        mkdir_p(self.outdir)
+
+    def open(self, name, mode='w'):
+        """ Open result file """
+        outfile = os.path.join(self.outdir, name)
+        return open(outfile, mode)
 
     def handle_line(self, identifier, line):
         """ Print one line prefixed by id in format: """
@@ -61,104 +86,45 @@ class NodeResults(object):
 
         if 'Neighbours' in line:
             # A569;Neighbours;6;A869;A172;C280;9869;B679;A269
-            values = line.split(';')
-            node = values[0]
-            neighbours = values[3:]
-            self.neighbours[node] = neighbours
-            return
+            node, _, _, neighs = line.split(';', 3)
 
-        if 'Values' in line:
+            self.neighbours[node] = sorted(neighs.split(';'))
+
+        elif 'Values' in line:
             # A869;Values;100;1.9330742E9;2.0307378E9
-            items = line.split(';')
-            node = items[0]
-            num_compute = int(items[2])
-            values = [str(float(val)) for val in items[3:]]
+            node, _, num_compute, values = line.split(';', 3)
 
-            values_list = self.node_measures.setdefault(node, [])
-            values_d = {
-                'num_compute': num_compute,
-                'values': values
-            }
-            values_list.append(values_d)
-            return
+            values = [str(float(v)) for v in values.split(';')]
+            values_d = {'num_compute': int(num_compute), 'values': values}
 
-        if 'FinalValue' in line:
+            self.node_measures.setdefault(node, []).append(values_d)
+
+        elif 'FinalValue' in line:
             # A869;FinalValue;100;32
-            items = line.split(';')
-            node = items[0]
-            num_compute = int(items[2])
-            final_value = str(int(items[3]))
+            node, _, num_compute, final_value  = line.split(';')
 
             self.node_finale_measures[node] = {
-                'num_compute': num_compute,
-                'value': final_value,
+                'num_compute': int(num_compute),
+                'value': str(int(final_value)),
             }
-            return
 
-    def write_results(self, use_node_compute=True):
-        """ Write all the experiment results """
-        self.write_neighbours_graph()
-        self.write_results_values(use_node_compute)
-        self.write_results_final_value()
+    def write_neighbours(self):
+        """ Write neighbours output """
+        # Write neighbours table
+        with self.open('neighbours.csv') as neigh:
+            print "Neighbours table written to %s" % neigh.name
+            for key, values in sorted(self.neighbours.items()):
+                neigh.write('%s:%s\n' % (key, ';'.join(values)))
 
-    def write_results_final_value(self):
-        """ Write the 'final_value' result files if there is some data """
-        if not len(self.node_finale_measures):
-            return  # No final value
-
-        all_name = '%s_final_all.csv' % self.outfilename
-        all_measures = open(all_name, 'w')
-        print "Write all final value to %s" % all_name
-
-        # write data for each node
-        for node, val_d in self.node_finale_measures.items():
-
-            name = '%s_final_%s.csv' % (self.outfilename, node)
-            print "Write final value to %s" % name
-
-            # create the lines
-            line = '%s' % (val_d['value'])
-            all_line = '%s,%s' % (node, val_d['value'])
-
-            # write datas
-            with open(name, 'w') as measures:
-                measures.write(line + '\n')
-            all_measures.write(all_line + '\n')
-        all_measures.close()
-
-    def write_results_values(self, use_node_compute=True):
-        """ Write the results to files """
-        all_name = '%s_all.csv' % self.outfilename
-        all_measures = open(all_name, 'w')
-        print "Write all values to %s" % all_name
-
-        for node, values in self.node_measures.items():
-            name = '%s_%s.csv' % (self.outfilename, node)
-            print "Write values to %s" % name
-            measures = open(name, 'w')
-            for i, val_d in enumerate(values):
-                # use remote compute number or local compute number == num line
-                compute_num = val_d['num_compute'] if use_node_compute else i
-
-                # create the lines
-                csv_vals = ','.join(val_d['values'])
-                line = '%s,%s' % (compute_num, csv_vals)
-                all_line = '%s,%s,%s' % (node, compute_num, csv_vals)
-
-                measures.write(line + '\n')
-                all_measures.write(all_line + '\n')
-
-            measures.close()
-        all_measures.close()
-
-    def write_neighbours_graph(self):
-        neighb_graph = self.neighbours_graph()
-        out_dot = '%s_graph.dot' % self.outfilename
-        with open(out_dot, 'w') as dot_f:
+        # Write 'dot' file
+        neighb_graph = self._neighbours_graph()
+        with self.open('graph.dot') as dot_f:
+            out_dot = dot_f.name
+            print "Neighbours dot-graph written to %s" % out_dot
             dot_f.write(neighb_graph)
-        print "Neighbours dot-graph written to %s" % out_dot
 
-        out_png = '%s_graph.png' % self.outfilename
+        # Generate '.png' graph
+        out_png = os.path.join(self.outdir, 'graph.png')
         cmd = ['dot', '-T', 'png', out_dot, '-o', out_png]
         try:
             subprocess.call(cmd)
@@ -168,9 +134,8 @@ class NodeResults(object):
             print "You can run the following command on your comuter:"
             print "    dot -T png results_graph.dot -o results_graph.png"
 
-
-    def neighbours_graph(self):
-        links = self.neighbours_links()
+    def _neighbours_graph(self):
+        links = self._neighbours_links()
         res = ''
         res += 'digraph G {\n'
         res += '    center=""\n'
@@ -184,7 +149,8 @@ class NodeResults(object):
         res += '}\n'
         return res
 
-    def neighbours_links(self):
+    def _neighbours_links(self):
+        """ List of neighbours graph links """
         simple_links = set()
         double_links = set()
         for node, neighbours in self.neighbours.items():
@@ -200,43 +166,112 @@ class NodeResults(object):
                     double_links.add(link)
         return {'simple': simple_links, 'double': double_links}
 
+    def write_results(self, use_node_compute=True):
+        """ Write all the experiment results """
+        self.write_results_values(use_node_compute)
+        self.write_results_final_value()
+
+    def write_results_final_value(self):
+        """ Write the 'final_value' result files if there is some data """
+        if not len(self.node_finale_measures):
+            return  # No final value
+
+        all_measures = self.open('final_all.csv')
+        print "Write all final value to %s" % all_measures.name
+
+        # write data for each node
+        for node, val_d in self.node_finale_measures.items():
+            # create the lines
+            line = '%s' % (val_d['value'])
+            all_line = '%s,%s' % (node, val_d['value'])
+
+            # write per node data
+            name = 'final_%s.csv' % (node)
+            with self.open(name) as measures:
+                print "Write final value to %s" % measures.name
+                measures.write(line + '\n')
+
+            all_measures.write(all_line + '\n')
+        all_measures.close()
+
+    def write_results_values(self, use_node_compute=True):
+        """ Write the results to files """
+        all_measures = self.open('all.csv')
+        print "Write all values to %s" % all_measures.name
+
+        for node, values in self.node_measures.items():
+            name = '%s.csv' % node
+            measures = self.open(name)
+            print "Write values to %s" % measures.name
+            for i, val_d in enumerate(values):
+                # use remote compute number or local compute number == num line
+                compute_num = val_d['num_compute'] if use_node_compute else i
+
+                # create the lines
+                csv_vals = ','.join(val_d['values'])
+                line = '%s,%s' % (compute_num, csv_vals)
+                all_line = '%s,%s,%s' % (node, compute_num, csv_vals)
+
+                measures.write(line + '\n')
+                all_measures.write(all_line + '\n')
+
+            measures.close()
+        all_measures.close()
+
 
 ALGOS = {
+    'create_graph': algorithm_management.create_graph,
+    'load_graph': algorithm_management.load_graph,
+    'print_graph': algorithm_management.print_graph,
     'syncronous': algorithm_management.syncronous_mode,
     'gossip': algorithm_management.gossip_mode,
     'num_nodes': algorithm_management.find_num_node_gossip_mode,
 }
+
+def parse():
+    parser = opts_parser()
+    opts = parser.parse_args()
+    opts.with_a8 = False  # HACK for the moment, required by 'select_nodes'
+
+    if (opts.algo not in ['create_graph', 'print_graph'] and
+            opts.neighbours is None):
+        parser.error('neighbours not provided')
+    if (opts.algo in ['syncronous', 'gossip', 'num_nodes'] and
+            opts.num_loop is None):
+        parser.error('num_loop not provided')
+
+    try:
+        opts.nodes_list = serial.SerialAggregator.select_nodes(opts)
+    except (ValueError, RuntimeError) as err:
+        parser.error('%s' % err)
+    return opts
 
 
 def main():
     """ Reads nodes from ressource json in stdin and
     aggregate serial links of all nodes
     """
-    parser = opts_parser()
-    opts = parser.parse_args()
 
-    try:
-
-        opts.with_a8 = False  # HACK for the moment, required by 'select_nodes'
-        nodes_list = serial.SerialAggregator.select_nodes(opts)
-        print "Using algorith: %r" % opts.algo
-        algorithm = ALGOS[opts.algo]
-    except (ValueError, RuntimeError) as err:
-        sys.stderr.write("%s\n" % err)
-        exit(1)
+    opts = parse()
+    print "Using algorithm: %r" % opts.algo
+    algorithm = ALGOS[opts.algo]
 
     # Connect to the nodes
-    results = NodeResults(opts.outfile)
-    with serial.SerialAggregator(nodes_list,
-                                 print_lines=True,
-                                 line_handler=results.handle_line)\
-            as aggregator:
+    results = NodeResults(opts.outdir)
+    with serial.SerialAggregator(opts.nodes_list, print_lines=True,
+                                 line_handler=results.handle_line) as aggr:
         time.sleep(2)
         # Run the algorithm
-        algorithm(aggregator, opts.num_loop)
+        algorithm(aggr, num_loop=opts.num_loop, neighbours=opts.neighbours)
         time.sleep(3)
 
-    results.write_results(opts.algo == 'syncronous')
+
+    if opts.algo in ['create_graph', 'print_graph']:
+        results.write_neighbours()
+    elif opts.algo == 'load_graph':
+        pass
+    else:
+        results.write_results(opts.algo == 'syncronous')
 
 
 if __name__ == "__main__":
