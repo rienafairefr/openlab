@@ -59,7 +59,7 @@ def print_graph(aggregator, **_):
     broadcast_slow(aggregator, 'graph-print')
 
 
-def syncronous_mode(aggregator, num_loop=0, **_):
+def syncronous(aggregator, num_loop=0, **_):
     """ Run messages sending and all in syncronous mode """
     broadcast_slow(aggregator, 'reset values', 0)
     broadcast_slow(aggregator, 'print-values', 0)
@@ -69,7 +69,7 @@ def syncronous_mode(aggregator, num_loop=0, **_):
         broadcast_slow(aggregator, 'compute_values', 0)
         broadcast_slow(aggregator, 'print-values', 0)
 
-def gossip_mode(aggregator, num_loop=0, **_):
+def gossip(aggregator, num_loop=0, **_):
     """ Run messages sending and all in syncronous mode """
     broadcast_slow(aggregator, 'reset values', 0)
     broadcast_slow(aggregator, 'print-values', 0)
@@ -78,7 +78,7 @@ def gossip_mode(aggregator, num_loop=0, **_):
         random_gossip_send(aggregator, 'send_values compute')
         broadcast_slow(aggregator, 'print-values', 0)
 
-def find_num_node_gossip_mode(aggregator, num_loop=0, **_):
+def num_nodes_gossip(aggregator, num_loop=0, **_):
     """ Find the number of nodes after having run in gossip """
-    gossip_mode(aggregator, num_loop)
+    gossip(aggregator, num_loop)
     broadcast_slow(aggregator, 'print-final-values', 0)

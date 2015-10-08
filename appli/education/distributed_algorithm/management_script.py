@@ -9,9 +9,8 @@ import subprocess
 
 from iotlabaggregator import serial
 from iotlabcli.parser import common as common_parser
-import json
 
-import algorithm_management
+import algorithm_management as _algos
 
 def _neighbours(file_path):
     """" Load neighbours graph file """
@@ -112,7 +111,7 @@ class NodeResults(object):
 
         elif 'FinalValue' in line:
             # A869;FinalValue;100;32
-            node, _, num_compute, final_value  = line.split(';')
+            node, _, num_compute, final_value = line.split(';')
 
             self.node_finale_measures[node] = {
                 'num_compute': int(num_compute),
@@ -177,35 +176,19 @@ class NodeResults(object):
                     double_links.add(link)
         return {'simple': simple_links, 'double': double_links}
 
-    def write_results(self, use_node_compute=True):
-        """ Write all the experiment results """
-        self.write_results_values(use_node_compute)
-        self.write_results_final_value()
+    @staticmethod
+    def nop(**_):
+        pass
 
-    def write_results_final_value(self):
-        """ Write the 'final_value' result files if there is some data """
-        if not len(self.node_finale_measures):
-            return  # No final value
+    def write_algo_results(self):
+        self._write_results_values(use_node_compute=False)
+        self._write_results_final_value()
 
-        all_measures = self.open('final_all.csv')
-        print "Write all final value to %s" % all_measures.name
+    def write_algo_results_num_compute(self):
+        self._write_results_values(use_node_compute=True)
+        self._write_results_final_value()
 
-        # write data for each node
-        for node, val_d in self.node_finale_measures.items():
-            # create the lines
-            line = '%s' % (val_d['value'])
-            all_line = '%s,%s' % (node, val_d['value'])
-
-            # write per node data
-            name = 'final_%s.csv' % (node)
-            with self.open(name) as measures:
-                print "Write final value to %s" % measures.name
-                measures.write(line + '\n')
-
-            all_measures.write(all_line + '\n')
-        all_measures.close()
-
-    def write_results_values(self, use_node_compute=True):
+    def _write_results_values(self, use_node_compute=True):
         """ Write the results to files """
         all_measures = self.open('all.csv')
         print "Write all values to %s" % all_measures.name
@@ -229,14 +212,42 @@ class NodeResults(object):
             measures.close()
         all_measures.close()
 
+    def _write_results_final_value(self):
+        """ Write the 'final_value' result files if there is some data """
+        if not len(self.node_finale_measures):
+            return  # No final value
+
+        all_measures = self.open('final_all.csv')
+        print "Write all final value to %s" % all_measures.name
+
+        # write data for each node
+        for node, val_d in self.node_finale_measures.items():
+            # create the lines
+            line = '%s' % (val_d['value'])
+            all_line = '%s,%s' % (node, val_d['value'])
+
+            # write per node data
+            name = 'final_%s.csv' % (node)
+            with self.open(name) as measures:
+                print "Write final value to %s" % measures.name
+                measures.write(line + '\n')
+
+            all_measures.write(all_line + '\n')
+        all_measures.close()
+
+
+
+
 
 ALGOS = {
-    'create_graph': algorithm_management.create_graph,
-    'load_graph': algorithm_management.load_graph,
-    'print_graph': algorithm_management.print_graph,
-    'syncronous': algorithm_management.syncronous_mode,
-    'gossip': algorithm_management.gossip_mode,
-    'num_nodes': algorithm_management.find_num_node_gossip_mode,
+    'create_graph': (_algos.create_graph, 'write_neighbours'),
+    'print_graph': (_algos.print_graph, 'write_neighbours'),
+    'load_graph': (_algos.load_graph, 'nop'),
+
+    'syncronous': (_algos.syncronous, 'write_algo_results_num_compute'),
+    'gossip': (_algos.gossip, 'write_algo_results'),
+    'num_nodes': (_algos.num_nodes_gossip, 'write_algo_results'),
+
 }
 
 def parse():
@@ -265,10 +276,12 @@ def main():
 
     opts = parse()
     print "Using algorithm: %r" % opts.algo
-    algorithm = ALGOS[opts.algo]
+    results = NodeResults(opts.outdir)
+
+    algorithm, handle_result = ALGOS[opts.algo]
+    handle_result_fct = getattr(results, handle_result)
 
     # Connect to the nodes
-    results = NodeResults(opts.outdir)
     with serial.SerialAggregator(opts.nodes_list, print_lines=True,
                                  line_handler=results.handle_line) as aggr:
         time.sleep(2)
@@ -276,13 +289,8 @@ def main():
         algorithm(aggr, **vars(opts))
         time.sleep(3)
 
-
-    if opts.algo in ['create_graph', 'print_graph']:
-        results.write_neighbours()
-    elif opts.algo == 'load_graph':
-        pass
-    else:
-        results.write_results(opts.algo == 'syncronous')
+    # Manage the results
+    handle_result_fct()
 
 
 if __name__ == "__main__":
