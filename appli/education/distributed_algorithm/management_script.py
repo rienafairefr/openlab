@@ -152,7 +152,7 @@ class NodeResults(object):
         except OSError:
             print "graphviz not installed. Can't generate neighbours graph"
             print "You can run the following command on your comuter:"
-            print "    dot -T png results_graph.dot -o results_graph.png"
+            print "    %s" % ' '.join(cmd)
 
     def _neighbours_graph(self):
         links = self._neighbours_links()
