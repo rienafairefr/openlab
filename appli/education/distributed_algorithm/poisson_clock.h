@@ -1,8 +1,8 @@
 #ifndef POISSON_CLOCK_H
 #define POISSON_CLOCK_H
 
-unsigned int poisson_delay_in_ticks(double lambda);
 
-int poisson_delay(int argc, char **argv);
+/* Calculate random step before next event in ticks */
+unsigned int poisson_step_ticks(double lambda);
 
 #endif//POISSON_CLOCK_H

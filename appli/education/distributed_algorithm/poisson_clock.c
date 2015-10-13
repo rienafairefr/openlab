@@ -1,10 +1,6 @@
 #include <stdlib.h>
-#include "config.h"
 #include "random.h"
-#include "soft_timer_delay.h"
 #include "poisson_clock.h"
-
-
 
 // STEP 1 tick
 #define STEP 1
@@ -15,7 +11,7 @@
 // It might correct the probability
 #define MAGIC 2
 
-unsigned int poisson_delay_in_ticks(double lambda)
+unsigned int poisson_step_ticks(double lambda)
 {
     double p = lambda * STEP * MAGIC;
     unsigned int delay = 0;
@@ -24,18 +20,4 @@ unsigned int poisson_delay_in_ticks(double lambda)
         delay += STEP;
 
     return delay;
-}
-
-
-
-int poisson_delay(int argc, char **argv)
-{
-    if (argc != 2)
-        return 1;
-    double lambda = atof(argv[1]);
-    unsigned int delay = poisson_delay_in_ticks(lambda);
-
-    float delay_s = (float)delay / (float)SOFT_TIMER_FREQUENCY;
-    MSG("PoissonDelay;%f\n", delay_s);
-    return 0;
 }

@@ -100,6 +100,21 @@ static int send_values(int argc, char **argv)
     return 0;
 }
 
+/* Print poisson delay values */
+int poisson_delay(int argc, char **argv)
+{
+    if (argc != 2)
+        return 1;
+    double lambda = atof(argv[1]);
+    unsigned int delay = poisson_step_ticks(lambda);
+
+    float delay_s = (float)delay / (float)SOFT_TIMER_FREQUENCY;
+    MSG("PoissonDelay;%f\n", delay_s);
+    return 0;
+}
+
+
+
 struct shell_command commands[] = {
 
     {"tx_power", "[low|high|<dBm_power>] Set tx power", network_set_tx_power},
