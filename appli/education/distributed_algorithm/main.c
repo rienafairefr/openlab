@@ -10,6 +10,7 @@
 #include "computing.h"
 #include "radio_network.h"
 #include "poisson_clock.h"
+#include "clock_convergence.h"
 #include "iotlab_uid.h"
 #include "config.h"
 
@@ -132,6 +133,9 @@ struct shell_command commands[] = {
     {"print-final-value", "print a calculated final int value", print_final_value},
 
     {"poisson-delay", "[lambda] Get poisson clock delay with parameter lambda", poisson_delay},
+
+    {"clock-convergence-start", "[lambda] Start clock convergence algorithm with poisson clock parameter lambda", clock_convergence_start},
+    {"clock-convergence-stop", "Stop clock convergence algorithm", clock_convergence_stop},
     {NULL, NULL, NULL},
 };
 
@@ -145,6 +149,7 @@ int main()
     network_init(CHANNEL);
     // init values at start
     init_values(0, NULL);
+    clock_convergence_init(TIME_SCALE, TIME_SCALE_RANDOM, TIME_OFFSET_RANDOM);
 
     shell_init(commands, 0);
 

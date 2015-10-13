@@ -60,8 +60,11 @@ def opts_parser():
     algo_group.add_argument('-t', '--tx-power', choices=TX_POWERS,
                             default='-17dBm', help='Graph transmission power')
 
+    # For poisson algorithms
     algo_group.add_argument('--lambda', dest='lambda_t', default=5, type=float,
                             help='Poisson clock lambda parameter')
+    algo_group.add_argument('-d', '--duration', dest='duration', type=float,
+                            help='Poisson experiment duration (s)')
 
     output = parser.add_argument_group(title="Output selection")
     output.add_argument('-o', '--out-dir', required=True,
@@ -86,6 +89,7 @@ class NodeResults(object):
         self.node_finale_measures = {}
 
         self.poisson = {}
+        self.clock = {}
 
         mkdir_p(self.outdir)
 
@@ -127,6 +131,11 @@ class NodeResults(object):
             # 1062;PoissonDelay;4.9169922E-1
             node, _, delay = line.split(';')
             self.poisson.setdefault(node, []).append(float(delay))
+        elif 'Clock' in line:
+            # 1062;Clock;4.9169922E-1
+            node, _, clock = line.split(';')
+            val = (time.time(), float(clock))
+            self.clock.setdefault(node, []).append(val)
 
     def write_neighbours(self):
         """ Write neighbours output """
@@ -260,6 +269,18 @@ class NodeResults(object):
 
         all_measures.close()
 
+    def write_clock(self):
+        """ Write the clock results """
+        all_measures = self.open('clock_all.csv')
+        print "Write all final value to %s" % all_measures.name
+
+        for node, values in self.clock.items():
+            # Save values in file
+            for timestamp, val in values:
+                all_measures.write('%s,%f,%f\n' % (node, timestamp, val))
+
+        all_measures.close()
+
 
 ALGOS = {
     'create_graph': (_algos.create_graph, 'write_neighbours'),
@@ -268,6 +289,7 @@ ALGOS = {
 
     'syncronous': (_algos.syncronous, 'write_algo_results_num_compute'),
     'gossip': (_algos.gossip, 'write_algo_results'),
+    'clock_convergence': (_algos.clock_convergence, 'write_clock'),
     'num_nodes': (_algos.num_nodes_gossip, 'write_algo_results'),
 
     'print_poisson': (_algos.print_poisson, 'write_poisson'),
@@ -279,12 +301,15 @@ def parse():
     opts = parser.parse_args()
     opts.with_a8 = False  # HACK for the moment, required by 'select_nodes'
 
-    if (opts.algo in ['load_graph', 'syncronous', 'gossip', 'num_nodes'] and
+    if (opts.algo in ['load_graph', 'syncronous', 'gossip', 'num_nodes',
+                      'clock_convergence'] and
             opts.neighbours is None):
         parser.error('neighbours not provided')
     if (opts.algo in ['syncronous', 'gossip', 'num_nodes', 'print_poisson'] and
             opts.num_loop is None):
         parser.error('num_loop not provided')
+    if (opts.algo in ['clock_convergence'] and opts.duration is None):
+        parser.error('duration not provided')
 
     try:
         opts.nodes_list = serial.SerialAggregator.select_nodes(opts)
