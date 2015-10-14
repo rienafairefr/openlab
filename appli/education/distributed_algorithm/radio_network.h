@@ -3,6 +3,12 @@
 #include "config.h"
 #include "computing.h"
 
+enum packet_type {
+    PKT_GRAPH = 0,
+    PKT_NEIGH = 1,
+    PKT_VALUES = 2,
+};
+
 extern uint32_t num_neighbours;
 extern uint16_t neighbours[MAX_NUM_NEIGHBOURS];
 
@@ -16,6 +22,10 @@ void network_reset(void);
 int network_set_tx_power(int argc, char **argv);
 
 
+void network_send(const void *packet, size_t length);
+
+/* Neighbours management */
+
 // Broadcast messages at low power to make you known to your neighbours
 int network_neighbours_discover(int argc, char **argv);
 // Send acknowledge messages to your neighbours nodes
@@ -28,7 +38,5 @@ int network_neighbours_print(int argc, char **argv);
 // Load the network neighbours table
 int network_neighbours_load(int argc, char **argv);
 
-// Send my values to the neighbours
-void network_send_values(uint8_t should_compute, struct values *values);
 
 #endif//RADIO_NETWORK_H

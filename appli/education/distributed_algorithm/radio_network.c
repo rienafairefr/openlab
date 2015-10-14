@@ -9,16 +9,11 @@
 
 uint16_t neighbours[MAX_NUM_NEIGHBOURS] = {0};
 uint32_t num_neighbours = 0;
+static void send(uint16_t addr, const void *packet, size_t length);
 
 static struct {
     uint32_t channel;
 } rn_config;
-
-enum packet_type {
-    PKT_GRAPH = 0,
-    PKT_NEIGH = 1,
-    PKT_VALUES = 2,
-};
 
 
 #define ADDR_BROADCAST 0xFFFF
@@ -38,6 +33,14 @@ void network_reset()
     num_neighbours = 0;
     mac_csma_init(rn_config.channel, RADIO_POWER);
 }
+
+
+void network_send(const void *packet, size_t length)
+{
+    send(ADDR_BROADCAST, packet, length);
+}
+
+
 
 struct msg_send
 {
@@ -66,7 +69,7 @@ static void do_send(handler_arg_t arg)
 
 }
 
-static void send(uint16_t addr, void *packet, size_t length)
+static void send(uint16_t addr, const void *packet, size_t length)
 {
     static struct msg_send send_cfg;
     send_cfg.try = 0;
@@ -242,56 +245,6 @@ static void network_neighbours_validate(uint16_t src_addr,
     }
 }
 
-/*
- * Values management
- */
-struct values_pkt {
-    uint8_t type;
-    uint8_t should_compute;
-    uint32_t num_neighbours;
-    struct values values;
-};
-
-void network_send_values(uint8_t should_compute, struct values *values)
-{
-    struct values_pkt pkt;
-    memset(&pkt, 0, sizeof(pkt));
-
-    // Header
-    pkt.type           = PKT_VALUES;
-    pkt.should_compute = should_compute;
-    pkt.num_neighbours = num_neighbours;
-    // Values
-    memcpy(&pkt.values, values, sizeof(struct values));
-
-    send(ADDR_BROADCAST, &pkt, sizeof(struct values_pkt));
-}
-
-static void handle_value(uint16_t src_addr, const uint8_t *data, size_t length)
-{
-    if (sizeof(struct values_pkt) != length)
-        ERROR("Invalid Values pkt len\n");
-
-    int index = network_neighbour_id(src_addr);
-    if (index == -1) {
-        DEBUG("Values from %04x: not neighbour\n", src_addr);
-        return;
-    } else {
-        DEBUG("Values from %04x\n", src_addr);
-    }
-    struct values_pkt pkt;
-    memcpy(&pkt, data, sizeof(struct values_pkt));
-
-    struct received_values *neigh_values = &neighbours_values[index];
-    neigh_values->valid = 1;
-    neigh_values->num_neighbours = pkt.num_neighbours;
-    memcpy(&neigh_values->values, &pkt.values, sizeof(struct values));
-
-    // Gossip mode, compute after each measures received
-    if (pkt.should_compute)
-        compute_all_values_from_gossip(neigh_values);
-}
-
 
 /*
  * Packet reception
@@ -305,12 +258,25 @@ void mac_csma_data_received(uint16_t src_addr,
     switch (pkt_type) {
     case (PKT_GRAPH):
         network_neighbours_add(src_addr, rssi);
-        break;
+        return;
     case (PKT_NEIGH):
         network_neighbours_validate(src_addr, data, length);
-        break;
+        return;
+    }
+
+    // Filter neighbours packets
+    int index = network_neighbour_id(src_addr);
+    if (index == -1) {
+        DEBUG("Packet from %04x: not neighbour\n", src_addr);
+        return;
+    } else {
+        DEBUG("Packet from %04x\n", src_addr);
+    }
+
+    // Application packets
+    switch (pkt_type) {
     case (PKT_VALUES):
-        handle_value(src_addr, data, length);
+        computing_handle_values(src_addr, data, length, index);
         break;
     default:
         INFO("Unknown pkt type %01x from %04x\n", pkt_type, src_addr);

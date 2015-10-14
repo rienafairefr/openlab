@@ -97,7 +97,7 @@ static int send_values(int argc, char **argv)
             ERROR("%s: invalid arguments\n", argv[0]);
             return 1;
     }
-    network_send_values(compute_on_rx, &my_values);
+    computing_send_values(compute_on_rx);
     return 0;
 }
 
