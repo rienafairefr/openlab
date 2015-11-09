@@ -3,6 +3,7 @@
 
 """ Get the iotlab-uip for all experiment nodes """
 
+import sys
 import os
 import time
 import subprocess
@@ -11,64 +12,24 @@ from iotlabaggregator import serial
 from iotlabcli.parser import common as common_parser
 
 import algorithm_management as _algos
-
-
-def _neighbours(file_path):
-    """" Load neighbours graph file """
-    neighbours = {}
-    with open(file_path) as neigh_file:
-        for line in neigh_file:
-            node, neighs = line.strip().split(':')
-            neighbours[node] = neighs.split(';')
-    return neighbours
-
-
-TX_POWERS = [
-    '-17dBm', '-12dBm', '-9dBm', '-7dBm',
-    '-5dBm', '-4dBm', '-3dBm', '-2dBm',
-    '-1dBm', '0dBm', '0.7dBm', '1.3dBm',
-    '1.8dBm', '2.3dBm', '2.8dBm', '3dBm',
-]
+import parser as _parser
 
 
 def opts_parser():
     """ Argument parser object """
-    import argparse
-    parser = argparse.ArgumentParser()
-    common_parser.add_auth_arguments(parser)
-
-    nodes_group = parser.add_argument_group(
-        description="By default, select currently running experiment nodes",
-        title="Nodes selection")
-
-    nodes_group.add_argument('-i', '--id', dest='experiment_id', type=int,
-                             help='experiment id submission')
-    nodes_group.add_argument('-l', '--list', dest='nodes_list',
-                             type=common_parser.nodes_list_from_str,
-                             help='nodes list, may be given multiple times')
+    parser = _parser.base_parser()
 
     algo_group = parser.add_argument_group(title="Algorithm selection")
 
     algo_group.add_argument('-a', '--algo', default='syncronous',
                             choices=ALGOS.keys(), help='Algorithm to run')
-    algo_group.add_argument('-n', '--num-loop', type=int,
-                            dest='num_loop', help='number_of_loops_to_run')
-
-    algo_group.add_argument('-g', '--neighbours-graph', type=_neighbours,
-                            dest='neighbours', help='Neighbours csv')
-
-    algo_group.add_argument('-t', '--tx-power', choices=TX_POWERS,
-                            default='-17dBm', help='Graph transmission power')
+    _parser.num_loop(algo_group, required=False)
+    _parser.neighbours_graph(algo_group, required=False)
+    _parser.txpower(algo_group)
 
     # For poisson algorithms
-    algo_group.add_argument('--lambda', dest='lambda_t', default=5, type=float,
-                            help='Poisson clock lambda parameter')
-    algo_group.add_argument('-d', '--duration', dest='duration', type=float,
-                            help='Poisson experiment duration (s)')
-
-    output = parser.add_argument_group(title="Output selection")
-    output.add_argument('-o', '--out-dir', required=True,
-                        dest='outdir', help='Output directory')
+    _parser.lambda_t(algo_group, required=False)
+    _parser.duration(algo_group, required=False)
 
     return parser
 
@@ -308,26 +269,31 @@ def parse():
     if (opts.algo in ['syncronous', 'gossip', 'num_nodes', 'print_poisson'] and
             opts.num_loop is None):
         parser.error('num_loop not provided')
-    if (opts.algo in ['clock_convergence'] and opts.duration is None):
+    if opts.algo in ['clock_convergence'] and opts.duration is None:
         parser.error('duration not provided')
+
+    return opts
+
+
+def algorithm_main(algorithm):
+    """ Algorithm generic main function """
+    opts = _parser.algorithm_parser().parse_args()
+    run(algorithm, opts)
+
+
+def run(algo, opts):
+    """ Execute 'algorithm' and 'handle_result' function name with 'opts'"""
+
+    algorithm, handle_result = ALGOS[algo]
 
     try:
         opts.nodes_list = serial.SerialAggregator.select_nodes(opts)
     except (ValueError, RuntimeError) as err:
-        parser.error('%s' % err)
-    return opts
+        print >> sys.stderr, "Error while calculating nodes list:\n\t%s" % err
+        exit(1)
 
-
-def main():
-    """ Reads nodes from ressource json in stdin and
-    aggregate serial links of all nodes
-    """
-
-    opts = parse()
-    print "Using algorithm: %r" % opts.algo
     results = NodeResults(opts.outdir)
 
-    algorithm, handle_result = ALGOS[opts.algo]
     handle_result_fct = getattr(results, handle_result)
 
     # Connect to the nodes
@@ -340,6 +306,15 @@ def main():
 
     # Manage the results
     handle_result_fct()
+
+
+def main():
+    """ Reads nodes from ressource json in stdin and
+    aggregate serial links of all nodes
+    """
+    opts = parse()
+    print "Using algorithm: %r" % opts.algo
+    run(opts.algo, opts)
 
 
 if __name__ == "__main__":
