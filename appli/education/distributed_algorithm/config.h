@@ -9,7 +9,8 @@
 // choose channel in [11-26]
 #define CHANNEL 12
 
-#define NUM_VALUES           2
+#define NUM_VALUES           1
+
 #define MIN_RSSI           -70
 
 #define TIME_SCALE           1.0
