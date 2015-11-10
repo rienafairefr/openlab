@@ -1,13 +1,15 @@
-NAME = tp-description
-all: $(NAME).pdf clean
+NAME = tp-description TP-DistribAlg-2015-v1
+PDFS = $(patsubst %,%.pdf,$(NAME))
+PDFFLAGS = -halt-on-error -file-line-error
+all: $(PDFS)
 
-%.pdf: %.aux
-	pdflatex $*.tex
-%.aux: %.tex
-	pdflatex $*.tex
+$(PDFS): %.pdf: %.tex
+	pdflatex $(PDFFLAGS) $*.tex
+	pdflatex $(PDFFLAGS) $*.tex
+	pdflatex $(PDFFLAGS) $*.tex
 
 clean:
-	$(RM) $(NAME).log $(NAME).aux
+	$(RM) *.log *.aux
 
 realclean: clean
-	$(RM) $(NAME).pdf
+	$(RM) $(PDFS)

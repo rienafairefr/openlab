@@ -1,5 +1,6 @@
 \documentclass{article}
 \usepackage{amsmath,amssymb,bbm, url,color}
+\usepackage[hidelinks]{hyperref}
 
 \addtolength{\textwidth}{2cm}
 \addtolength{\hoffset}{-1cm}
@@ -12,9 +13,9 @@
 
 \begin{document}
 \title{
-{\normalsize TP (i.e., applications lab) for the class:}\\[-1mm]
+{\normalsize Lab sessions for the class}\\[-1mm]
 Distributed Algorithms and Network Systems\\[-2mm]
-{\normalsize MiSCIT Master -- Grenoble -- fall 2014}\\[-1mm]
+{\normalsize MiSCIT Master -- Grenoble -- fall 2015}\\[-1mm]
 {\normalsize prepared by Federica Garin and Ga\"{e}tan Harter}}
 \date{}
 \maketitle
@@ -32,7 +33,7 @@ and do the following tutorials (First steps):
 \item Submit an experiment with Web portal: M3 nodes;
 \item Get and compile a firmware code for a M3 node.
 
-% TODO Replace this part by a tutorial that explains how to do it
+% No tutorial for the moment for this
 \item Configure the authentication for server tools\\
     Open a terminal, run the following command and type your password
 \begin{verbatim}ssh -t <username>@grenoble.iot-lab.info "auth-cli --user \$USER"
@@ -48,7 +49,9 @@ Retype password:
 
 You are given an already-written firmware that allows you to interact with the nodes, and which has two modes, either synchronous or gossip. In synchronous mode, at each iteration, all communications take place, then all local computations are done. In gossip mode, at each iteration a random node is selected to send its state; all neighbors having received such message immediately proceed to do a local computation and update local state.
 
-There are python scripts already written for you; the thing you will need to do is to open some C file and modify it, so as to write the suitable functions for the required computations.
+There are python scripts already written for you; the thing you will need to do
+is to open some C file and modify it, so as to write the suitable functions for
+the required computations. 
 
 You should:
 \begin{itemize}
@@ -80,15 +83,28 @@ Use \verb=ls= to see which files are there. The ones you need are the following:
 	\item Mainly, you will need to modify \verb=computing.c= to add the functions for computing (more details below)
 	\item In the file \verb=config.h=, you will need to modify:
 		\begin{itemize}
-		\item The number of values (i.e., how many scalars there are in the state of each node). This is the constant \verb=NUM_VALUES= defined quite at the beginning of the file. You will need $1$ when doing scalar consensus, you will need more when doing max-consensus for node-counting. Choose an integer between $1$ and $14$.
-		\item The channel: to avoid interfering with other groups, set the constant \verb=CHANNEL= to different numbers, group $x$ will take channel $10+x$, e.g., group 2 gets channel $12$
-		\item Possibly, you might  need to modify another thing in this file: the transmission power \verb=MIN_RSSI= in case the graph is too sparse (disconnected) or too dense (too many communications, not an interesting example of distributed computing). This signal strength is in dB, and there is a minus sign before the value, so putting a higher value means decreasing strength.
+        \item The number of values (i.e., how many scalars there are in the state
+            of each node). This is the constant \verb=NUM_VALUES= defined
+            quite at the beginning of the file. You will need $1$ when doing
+            scalar consensus, you will need more when doing max-consensus
+            for node-counting. Choose an integer between $1$ and $14$.
+		\item The channel: to avoid interfering with other groups, set the
+            constant \verb=CHANNEL= to different numbers, group $x$ will take
+            channel $10+x$, e.g., group 2 gets channel $12$
+		\item Possibly, you might  need to modify another thing in this file:
+            the power reception threshold \verb=MIN_RSSI= in case the graph is
+            too sparse (disconnected) or too dense (too many communications, not
+            an interesting example of distributed computing). This signal
+            strength is in dB, and there is a minus sign before the value,
+            so putting a higher value means decreasing strength.
 		\end{itemize}
 	\end{itemize}
 You can open and modify the files directly on the server, without downloading them to your local computer, just use \verb=nano <filename>.c= to open a file in a text editor (to save the file after having modified it, follow instructions to quit and then you will be prompted with the question where you wish to save it)
 \item About the functions in \verb=computing.c=
 	\begin{itemize}
-	\item  \verb=init_value()= does random initialization; this is for a scalar value, then it is called multiple times if \verb=NUM_VALUES=$\ge 2$ (remember, this parameter is set in the file \verb=config.h=)
+	\item  \verb=init_value()= does random initialization; this is for a scalar value.
+        It is called multiple times if \verb=NUM_VALUES=$\ge 2$ (remember,
+        this parameter is set in the file \verb=config.h=)
 	\item \verb=compute_value_from_neighbours= has to be used only in the synchronous mode. It allows a node to compute its new state given: its own old state (\verb=my_value=), its own degree (\verb=my_degree=), and a structure received from neighbors, containing their state and degree. Notice: if you are able to add the contribution of each neighbor incrementally, you can use the already-written code to parse the structure of received values, so that you do not need to worry about that: at iteration $i$, which concerns the neighbor $i$, \verb=neighbour_degree= is the degree of $i$ and \verb=neighbour_value= is the value (the state) of $i$. Also notice: when there is more than one state per node (\verb=NUM_VALUES=$\ge 2$), this function is called many times, one per each state (it operates on a scalar state, not vector).
 	\item \verb=compute_value_from_gossip= has to be used only in gossip mode. It allows a node to compute its new state, given its old state and the received state (received from a neighbor having done the gossip broadcast transmission).
 	\item \verb=compute_final_value= is needed when computing the estimated number of nodes, after the gossip max-consensus algorithm

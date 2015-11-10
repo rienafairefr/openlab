@@ -170,7 +170,7 @@ class NodeResults(object):
 
     def _write_results_values(self, use_node_compute=True):
         """ Write the results to files """
-        all_measures = self.open('all.csv')
+        all_measures = self.open('results_all.csv')
         print "Write all values to %s" % all_measures.name
 
         for node, values in self.node_measures.items():
@@ -260,7 +260,6 @@ ALGOS = {
 def parse():
     parser = opts_parser()
     opts = parser.parse_args()
-    opts.with_a8 = False  # HACK for the moment, required by 'select_nodes'
 
     if (opts.algo in ['load_graph', 'syncronous', 'gossip', 'num_nodes',
                       'clock_convergence'] and
@@ -287,6 +286,7 @@ def run(algo, opts):
     algorithm, handle_result = ALGOS[algo]
 
     try:
+        opts.with_a8 = False  # HACK for the moment, required by 'select_nodes'
         opts.nodes_list = serial.SerialAggregator.select_nodes(opts)
     except (ValueError, RuntimeError) as err:
         print >> sys.stderr, "Error while calculating nodes list:\n\t%s" % err
