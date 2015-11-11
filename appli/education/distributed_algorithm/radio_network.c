@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include "soft_timer.h"
 #include "radio_network.h"
+#include "clock_convergence.h"
 #include "mac_csma.h"
 #include "phy_power.c.h"
 
@@ -45,7 +46,6 @@ void network_send_no_retry(const void *packet, size_t length)
 {
     send(ADDR_BROADCAST, packet, length, 1);
 }
-
 
 
 struct msg_send
@@ -285,6 +285,9 @@ void mac_csma_data_received(uint16_t src_addr,
     switch (pkt_type) {
     case (PKT_VALUES):
         computing_handle_values(src_addr, data, length, index);
+        break;
+    case (PKT_CLOCK):
+        clock_convergence_handle_time(src_addr, data, length);
         break;
     default:
         INFO("Unknown pkt type %01x from %04x\n", pkt_type, src_addr);

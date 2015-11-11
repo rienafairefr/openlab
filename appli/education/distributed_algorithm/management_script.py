@@ -92,10 +92,11 @@ class NodeResults(object):
             # 1062;PoissonDelay;4.9169922E-1
             node, _, delay = line.split(';')
             self.poisson.setdefault(node, []).append(float(delay))
+
         elif 'Clock' in line:
-            # 1062;Clock;4.9169922E-1
-            node, _, clock = line.split(';')
-            val = (time.time(), float(clock))
+            # 1062;Clock;4.9169922E-1;4.9169922E-1
+            node, _, sys_clock, virt_clock = line.split(';')
+            val = (time.time(), float(sys_clock), float(virt_clock))
             self.clock.setdefault(node, []).append(val)
 
     def write_neighbours(self):
@@ -223,8 +224,9 @@ class NodeResults(object):
 
         for node, values in self.clock.items():
             # Save values in file
-            for timestamp, val in values:
-                all_measures.write('%s,%f,%f\n' % (node, timestamp, val))
+            for timestamp, sys_clock, virt_clock in values:
+                all_measures.write('%s,%f,%f,%f\n' % (node, timestamp,
+                                                   sys_clock, virt_clock))
 
         all_measures.close()
 
@@ -263,6 +265,12 @@ def parse():
 def algorithm_main(algorithm):
     """ Algorithm generic main function """
     opts = _parser.algorithm_parser().parse_args()
+    run(algorithm, opts)
+
+
+def poisson_main(algorithm):
+    """ Algorithm poisson generic main function """
+    opts = _parser.poisson_parser().parse_args()
     run(algorithm, opts)
 
 

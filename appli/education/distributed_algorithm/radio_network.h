@@ -7,6 +7,7 @@ enum packet_type {
     PKT_GRAPH = 0,
     PKT_NEIGH = 1,
     PKT_VALUES = 2,
+    PKT_CLOCK = 3,
 };
 
 extern uint32_t num_neighbours;

@@ -38,6 +38,17 @@ def algorithm_parser():
     return algo_parser
 
 
+def poisson_parser():
+    """ Algorithm poisson parser """
+    algo_parser = base_parser()
+    algo_opts = algo_parser.add_argument_group(title="Algorithm options")
+
+    lambda_t(algo_opts)
+    duration(algo_opts)
+
+    return algo_parser
+
+
 def num_loop(parser, required=True):
     """ Add num_loop option """
     parser.add_argument('-n', '--num-loop', type=int,

@@ -109,7 +109,8 @@ def num_nodes_gossip(aggregator, num_loop=0, **_):
 
 
 @with_neighbours_graph
-def clock_convergence(aggregator, lambda_t=5, duration=60, **_):
+def clock_convergence(aggregator, lambda_t=0.02, duration=60, **_):
+    """ Run a clock_convergence algorithm """
     broadcast_slow(aggregator, 'clock-convergence-start %f' % lambda_t, 0)
     try:
         time.sleep(duration)
