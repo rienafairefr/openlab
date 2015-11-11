@@ -174,22 +174,16 @@ class NodeResults(object):
         print "Write all values to %s" % all_measures.name
 
         for node, values in self.node_measures.items():
-            name = '%s.csv' % node
-            measures = self.open(name)
-            print "Write values to %s" % measures.name
-            for i, val_d in enumerate(values):
+            for i, val_d in enumerate(values, start=1):
                 # use remote compute number or local compute number == num line
                 compute_num = val_d['num_compute'] if use_node_compute else i
 
                 # create the lines
                 csv_vals = ','.join(val_d['values'])
-                line = '%s,%s' % (compute_num, csv_vals)
                 all_line = '%s,%s,%s' % (node, compute_num, csv_vals)
 
-                measures.write(line + '\n')
                 all_measures.write(all_line + '\n')
 
-            measures.close()
         all_measures.close()
 
     def _write_results_final_value(self):
@@ -203,15 +197,7 @@ class NodeResults(object):
         # write data for each node
         for node, val_d in self.node_finale_measures.items():
             # create the lines
-            line = '%s' % (val_d['value'])
             all_line = '%s,%s' % (node, val_d['value'])
-
-            # write per node data
-            name = 'final_%s.csv' % (node)
-            with self.open(name) as measures:
-                print "Write final value to %s" % measures.name
-                measures.write(line + '\n')
-
             all_measures.write(all_line + '\n')
         all_measures.close()
 
