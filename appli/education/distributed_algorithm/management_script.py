@@ -7,9 +7,10 @@ import sys
 import os
 import time
 import subprocess
+import random
+import math
 
 from iotlabaggregator import serial
-from iotlabcli.parser import common as common_parser
 
 import algorithm_management as _algos
 import parser as _parser
@@ -161,27 +162,46 @@ class NodeResults(object):
     def nop(**_):
         pass
 
-    def write_algo_results(self):
-        self._write_results_values(use_node_compute=False)
+    def write_results(self):
+        self._write_results_values()
         self._write_results_final_value()
 
-    def write_algo_results_num_compute(self):
-        self._write_results_values(use_node_compute=True)
+    def write_results_lambda_timestamp(self):
+        self._write_results_values(lambda_=0.2)
         self._write_results_final_value()
 
-    def _write_results_values(self, use_node_compute=True):
+    def _poisson_timestamps_measures(self, lambda_):
+        """ Generate poisson distributed timestamps for measures """
+        num_values = max([len(v) for v in self.node_measures.values()])
+
+        # There is num_values + 1 values with 0 at first
+        timestamps = [0.0]
+        for i in range(0, num_values):
+            delay = - math.log(random.random()) / lambda_
+            timestamps.append(timestamps[i] + delay)
+
+        return timestamps
+
+    def _write_results_values(self, lambda_=0.0):
         """ Write the results to files """
         all_measures = self.open('results_all.csv')
         print "Write all values to %s" % all_measures.name
 
+        # Generate a false poisson clock timestamp
+        # Using a real one would make the experiment take too long.
+        # Use lambda = lambda_ * num_nodes
+        lambda_ *= len(self.node_measures)
+        poisson_times = self._poisson_timestamps_measures(lambda_)
+
         for node, values in self.node_measures.items():
             for i, val_d in enumerate(values, start=1):
-                # use remote compute number or local compute number == num line
-                compute_num = val_d['num_compute'] if use_node_compute else i
 
                 # create the lines
                 csv_vals = ','.join(val_d['values'])
-                all_line = '%s,%s,%s' % (node, compute_num, csv_vals)
+                all_line = '%s,%s,%s' % (node, i, csv_vals)
+
+                if lambda_:
+                    all_line += ',%f' % poisson_times[i]
 
                 all_measures.write(all_line + '\n')
 
@@ -226,7 +246,7 @@ class NodeResults(object):
             # Save values in file
             for timestamp, sys_clock, virt_clock in values:
                 all_measures.write('%s,%f,%f,%f\n' % (node, timestamp,
-                                                   sys_clock, virt_clock))
+                                                      sys_clock, virt_clock))
 
         all_measures.close()
 
@@ -236,10 +256,12 @@ ALGOS = {
     'print_graph': (_algos.print_graph, 'write_neighbours'),
     'load_graph': (_algos.load_graph, 'nop'),
 
-    'syncronous': (_algos.syncronous, 'write_algo_results_num_compute'),
-    'gossip': (_algos.gossip, 'write_algo_results'),
+    'syncronous': (_algos.syncronous, 'write_results'),
+
+    'gossip': (_algos.gossip, 'write_results_lambda_timestamp'),
+    'num_nodes': (_algos.num_nodes_gossip, 'write_results_lambda_timestamp'),
+
     'clock_convergence': (_algos.clock_convergence, 'write_clock'),
-    'num_nodes': (_algos.num_nodes_gossip, 'write_algo_results'),
 
     'print_poisson': (_algos.print_poisson, 'write_poisson'),
 }
