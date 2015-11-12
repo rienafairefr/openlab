@@ -4,15 +4,18 @@ import random
 
 import functools
 
+DELAY = 0.05
 
-def broadcast_slow(aggregator, message, delay=0.05):
+
+def broadcast_slow(aggregator, message, delay=DELAY):
     """ Send message to all nodes with 'delay' between sends """
     for node in aggregator.iterkeys():
         aggregator._send(node, message + '\n')
         time.sleep(delay)
+    time.sleep(DELAY)
 
 
-def random_gossip_send(aggregator, message, delay=0.05):
+def random_gossip_send(aggregator, message, delay=DELAY):
     """ Send message to a random node """
     node = random.choice(aggregator.keys())
     aggregator._send(node, message + '\n')
@@ -27,7 +30,10 @@ def with_neighbours_graph(func):
         load_graph(aggregator, neighbours=neighbours)
         broadcast_slow(aggregator, 'reset values', 0)
         time.sleep(1)
-        return func(aggregator, **kwargs)
+        try:
+            return func(aggregator, **kwargs)
+        except KeyboardInterrupt:
+            pass
     return _wrapped_f
 
 
