@@ -23,6 +23,7 @@ int network_set_tx_power(int argc, char **argv);
 
 
 void network_send(const void *packet, size_t length);
+void network_send_no_retry(const void *packet, size_t length);
 
 /* Neighbours management */
 

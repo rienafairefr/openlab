@@ -6,10 +6,11 @@
 #include "mac_csma.h"
 #include "phy_power.c.h"
 
+#define RADIO_NETWORK_SEND_RETRY 5
 
 uint16_t neighbours[MAX_NUM_NEIGHBOURS] = {0};
 uint32_t num_neighbours = 0;
-static void send(uint16_t addr, const void *packet, size_t length);
+static void send(uint16_t addr, const void *packet, size_t length, int max_try);
 
 static struct {
     uint32_t channel;
@@ -37,7 +38,12 @@ void network_reset()
 
 void network_send(const void *packet, size_t length)
 {
-    send(ADDR_BROADCAST, packet, length);
+    send(ADDR_BROADCAST, packet, length, RADIO_NETWORK_SEND_RETRY);
+}
+
+void network_send_no_retry(const void *packet, size_t length)
+{
+    send(ADDR_BROADCAST, packet, length, 1);
 }
 
 
@@ -45,6 +51,7 @@ void network_send(const void *packet, size_t length)
 struct msg_send
 {
     int try;
+    int max_try;
     uint16_t addr;
     uint8_t pkt[MAC_PKT_LEN];
     size_t length;
@@ -58,23 +65,24 @@ static void do_send(handler_arg_t arg)
 
     ret = mac_csma_data_send(send_cfg->addr, send_cfg->pkt, send_cfg->length);
     if (ret != 0) {
-        DEBUG("Sent to %04x try %u\n", send_cfg->addr, send_cfg->try);
-    } else {
-        ERROR("Send to %04x failed, try %u. Retrying\n",
+        DEBUG("Sending to %04x try %u Success\n", send_cfg->addr, send_cfg->try);
+    } else if (++send_cfg->try < send_cfg->max_try) {
+        ERROR("Sending to %04x try %u Failed. Retrying\n",
                 send_cfg->addr, send_cfg->try);
-        if (send_cfg->try++ < 5)
-            event_post(EVENT_QUEUE_APPLI, do_send, arg);
-        //soft_timer_ms_to_ticks(20);
+        event_post(EVENT_QUEUE_APPLI, do_send, arg);
+    } else {
+        ERROR("Sending to %04x try %u Failed.\n",
+                send_cfg->addr, send_cfg->try);
     }
-
 }
 
-static void send(uint16_t addr, const void *packet, size_t length)
+static void send(uint16_t addr, const void *packet, size_t length, int max_try)
 {
     static struct msg_send send_cfg;
     send_cfg.try = 0;
     send_cfg.addr = addr;
     send_cfg.length = length;
+    send_cfg.max_try = max_try;
     memcpy(&send_cfg.pkt, packet, length);
 
     event_post(EVENT_QUEUE_APPLI, do_send, &send_cfg);
@@ -173,7 +181,7 @@ int network_neighbours_discover(int argc, char **argv)
     (void)argc;
     (void)argv;
     uint8_t pkt = PKT_GRAPH;
-    send(ADDR_BROADCAST, &pkt, 1);
+    send(ADDR_BROADCAST, &pkt, 1, RADIO_NETWORK_SEND_RETRY);
     return 0;
 }
 
@@ -220,7 +228,7 @@ int network_neighbours_acknowledge(int argc, char **argv)
     memset(&pkt, 0, sizeof(pkt));
     pkt.type = PKT_NEIGH;
     memcpy(&pkt.neighbours, neighbours, sizeof(neighbours));
-    send(ADDR_BROADCAST, &pkt, sizeof(pkt));
+    send(ADDR_BROADCAST, &pkt, sizeof(pkt), RADIO_NETWORK_SEND_RETRY);
     return 0;
 }
 
