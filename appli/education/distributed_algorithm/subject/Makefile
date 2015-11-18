@@ -1,4 +1,4 @@
-NAME = tp-description TP-DistribAlg-2015-v1
+NAME = tp-description TP-DistribAlg-2015-v1 TP-DistribAlg-2015-v2
 PDFS = $(patsubst %,%.pdf,$(NAME))
 PDFFLAGS = -halt-on-error -file-line-error
 all: $(PDFS)
