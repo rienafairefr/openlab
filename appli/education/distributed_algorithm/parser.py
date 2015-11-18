@@ -43,6 +43,7 @@ def poisson_parser():
     algo_parser = base_parser()
     algo_opts = algo_parser.add_argument_group(title="Algorithm options")
 
+    neighbours_graph(algo_opts)
     lambda_t(algo_opts)
     duration(algo_opts)
 
