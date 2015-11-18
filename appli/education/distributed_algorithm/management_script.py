@@ -190,8 +190,9 @@ class NodeResults(object):
         # Generate a false poisson clock timestamp
         # Using a real one would make the experiment take too long.
         # Use lambda = lambda_ * num_nodes
-        lambda_ *= len(self.node_measures)
-        poisson_times = self._poisson_timestamps_measures(lambda_)
+        if lambda_:
+            lambda_ *= len(self.node_measures)
+            poisson_times = self._poisson_timestamps_measures(lambda_)
 
         for node, values in self.node_measures.items():
             for i, val_d in enumerate(values, start=1):
