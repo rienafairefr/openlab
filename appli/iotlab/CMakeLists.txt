@@ -17,6 +17,7 @@ add_subdirectory(periph)
 # Add the fiteco directory
 add_subdirectory(fiteco_test)
 
+add_subdirectory(radio_energy_measurement)
 
 add_subdirectory(open_node_m3_autotest)
 endif (PLATFORM MATCHES "iotlab-.*")
