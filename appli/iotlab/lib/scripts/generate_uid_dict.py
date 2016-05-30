@@ -19,6 +19,8 @@ LIB_FILE_NAME = "iotlab_uid_num_hashtable"
 SOURCE_FILE_PATH = "%s/../" % CURRENT_DIRECTORY
 CURRENT_FILE_REL_PATH = os.path.relpath(__file__, SOURCE_FILE_PATH)
 
+DEV_URL = 'https://devwww.iot-lab.info/rest/'
+
 
 def extract_json(json_str):
     """ Parse json input string to a python object
@@ -41,7 +43,7 @@ def extract_json(json_str):
     return answer_dict
 
 
-def extract_nodes_uids(nodes_dict):
+def extract_nodes_uids(nodes_list):
     """ Extract the experiment-cli nodes_dict and generate parsed uid dict """
     uids_dict = {}
     # format
@@ -50,7 +52,7 @@ def extract_nodes_uids(nodes_dict):
     #             '<uid'>: [ <node_num>, node_num2]
     # ...
 
-    for node_dict in nodes_dict["items"]:
+    for node_dict in nodes_list:
         url = str(node_dict["network_address"])
         radio = node_dict["archi"].split(':')[1]
         uid = str(node_dict['uid']).lower()
@@ -87,10 +89,11 @@ def extract_nodes_uids(nodes_dict):
     return uids_dict
 
 
-def print_uids_and_nodes(nodes_uid_dict):
+def loginfo_uids_and_nodes(nodes_uid_dict):
     """ Print the nodes_uid_dict """
     for radio, values in nodes_uid_dict.items():
         logging.info("Radio %s: len %u", radio, len(values))
+    print ''
 
 
 def generate_table(nodes_uid_dict):
@@ -106,7 +109,7 @@ def generate_table(nodes_uid_dict):
     return archi_tables
 
 
-def print_hash_table(radio_type, archi_tables):
+def logdebug_hash_table(radio_type, archi_tables):
     """ Print the uids hash table for radio_type """
     logging.debug("Table for %r nodes", radio_type)
     table = archi_tables[radio_type]
@@ -170,20 +173,43 @@ def generate_a_c_hash_table(radio_type, archi_tables, lib_file_name):
         source.write(body_str)
 
 
+def nodes_dict_list(platform='prod'):
+    """Return list of nodes_dict for `platform`."""
+    env = os.environ.copy()
+    if platform == 'dev':
+        env['IOTLAB_API_URL'] = DEV_URL
+
+    json_str = subprocess.check_output('experiment-cli info -l', shell=True,
+                                       env=env)
+    json_dict = extract_json(json_str)
+    return json_dict['items']
+
+
 def _main():  # pragma: no cover
     """ Parse nodes list and print a uid hash table """
 
-    json_str = subprocess.check_output('experiment-cli info -l', shell=True)
-    json_dict = extract_json(json_str)
+    # Usage
+    # generate_uid_dict.py [--with-dev]
+    try:
+        with_dev = sys.argv[1] == '--with-dev'
+    except IndexError:
+        with_dev = False
 
-    nodes_uid_dict = extract_nodes_uids(json_dict)
-    print_uids_and_nodes(nodes_uid_dict)
+    # Query all nodes infos
+    nodes_list = []
+    nodes_list += nodes_dict_list(platform='prod')
+    if with_dev:
+        nodes_list += nodes_dict_list(platform='dev')
 
+    # Get an 'uid' -> node association dict
+    nodes_uid_dict = extract_nodes_uids(nodes_list)
+    loginfo_uids_and_nodes(nodes_uid_dict)
+
+    # Nodes hash table
     archi_tables = generate_table(nodes_uid_dict)
+    logdebug_hash_table('at86rf231', archi_tables)
 
-    print ''
-    print_hash_table('at86rf231', archi_tables)
-
+    # Write the hash table in file
     generate_a_c_hash_table('at86rf231', archi_tables, LIB_FILE_NAME)
 
 
