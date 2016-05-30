@@ -21,6 +21,6 @@ struct node {
     char *type_str;
 };
 
-extern const struct node_entry const nodes_uid_dict[1251];
+extern const struct node_entry const nodes_uid_dict[1296];
 
 struct node node_from_uid(uint16_t uid);
