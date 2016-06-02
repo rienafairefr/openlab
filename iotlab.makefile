@@ -6,7 +6,7 @@ compile_tests:
 	bash test_all_platforms.sh
 
 update:
-	python appli/iotlab/lib/scripts/generate_uid_dict.py
+	python appli/iotlab/lib/scripts/generate_uid_dict.py --with-dev
 
 check_updates: update
 	@if [[ $$(git status --porcelain --untracked-files=no) != '' ]]; \
