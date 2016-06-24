@@ -54,6 +54,10 @@ static inline volatile uint32_t *cm3_nvic_get_CLEAR_PENDING(uint8_t word)
     return (mem_get_reg32(CM3_NVIC_BASE_ADDRESS + CM3_NVIC_CLEAR_PENDING_OFFSET)
             + word);
 }
+static inline volatile uint32_t *cm3_nvic_get_STIR()
+{
+    return (mem_get_reg32(CM3_NVIC_BASE_ADDRESS + CM3_NVIC_STIR_OFFSET));
+}
 
 static inline volatile uint32_t *cm3_nvic_get_SYSTICK_CTRL()
 {
