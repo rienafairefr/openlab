@@ -126,7 +126,7 @@ void iotlab_serial_register_handler(iotlab_serial_handler_t *handler)
     ser.first_handler = handler;
 }
 
-int32_t iotlab_serial_send_frame(uint8_t type, packet_t *pkt)
+static int32_t iotlab_serial_init_tx_packet(uint8_t type, packet_t *pkt)
 {
     if (pkt->length > _PAYLOAD_MAX) {
         leds_on(RED_LED);
@@ -141,6 +141,15 @@ int32_t iotlab_serial_send_frame(uint8_t type, packet_t *pkt)
     pkt->raw_data[1] = pkt->length + 1;  // for type byte
     pkt->raw_data[2] = type;
     pkt->length += IOTLAB_SERIAL_HEADER_SIZE;
+
+    return 0;
+}
+
+int32_t iotlab_serial_send_frame(uint8_t type, packet_t *pkt)
+{
+    int32_t ret = iotlab_serial_init_tx_packet(type, pkt);
+    if (ret)
+        return ret;
 
     // Append to FIFO
     packet_fifo_append(&ser.tx.fifo, pkt);
