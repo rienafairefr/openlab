@@ -69,6 +69,16 @@ void packet_init();
  */
 packet_t *packet_alloc(uint8_t offset);
 
+
+/**
+ * Reset an allocated packet
+ *
+ * \param packet packet to reset.
+ * \param offset the offset of the data pointer in the packet, to provide
+ * space for future headers.
+ */
+void packet_reset(packet_t *packet, uint8_t offset);
+
 /**
  * Return the number of available packet_t in the packet pool.
  */

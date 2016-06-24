@@ -55,6 +55,14 @@ void packet_init()
         }
     }
 }
+
+void packet_reset(packet_t *packet, uint8_t offset)
+{
+    packet->data = packet->raw_data + offset;
+    packet->length = 0;
+    packet->next = NULL;
+}
+
 packet_t *packet_alloc(uint8_t offset)
 {
     uint32_t i;
@@ -78,9 +86,7 @@ packet_t *packet_alloc(uint8_t offset)
             packet_t *packet = packet_storage.packet_buffer + i;
 
             // Set data to point to the beginning of raw data plus the offset
-            packet->data = packet->raw_data + offset;
-            packet->length = 0;
-            packet->next = NULL;
+            packet_reset(packet, offset);
 
             // Return the pointer
             return packet;
