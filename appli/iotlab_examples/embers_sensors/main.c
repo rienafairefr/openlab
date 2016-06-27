@@ -33,7 +33,7 @@ static void print_sensors(handler_arg_t arg)
     printf("{\"temperature\":%f,\"luminosity\":%f, \"pressure\":%f\"}\n", 42.5 + temp / 480.0, lum, pres / 4096.0 );
     //printf("Chip temperature measure: %f\n", 42.5 + temp / 480.0);
     //printf("Luminosity measure: %f lux\n", light);
-    //printf("Pressure measure: %f mabar\n", pres / 4096.0); 
+    //printf("Pressure measure: %f mabar\n", pres / 4096.0);
 }
 #endif
 
@@ -41,7 +41,7 @@ static int sensors_on(int argc, char **argv)
 {
     uint16_t delay = TIMER_DEFAULT_DELAY;
     if (argc == 2)
-    	if (1 != sscanf(argv[1], "%u", &delay))
+        if (1 != sscanf(argv[1], "%u", &delay))
             return 1;
     soft_timer_start(&sensors_timer, soft_timer_ms_to_ticks(delay), 1);
     return 0;
