@@ -4,6 +4,7 @@
 #include <string.h>
 #include <time.h>
 #include "scanf.h"
+#include "random.h"
 
 #include <platform.h>
 #include "shell.h"
@@ -25,6 +26,7 @@ struct custom_timer
 static int sensors_handler(handler_arg_t arg);
 
 
+static int has_random_at_start = 1;
 static struct custom_timer sensors_timer = {
     .active = 0, .handler = sensors_handler};
 
@@ -62,6 +64,15 @@ static int sensors_handler(handler_arg_t arg)
     return soft_timer_s_to_ticks(timer->param_delay);
 }
 
+static unsigned random_delay_if_on(unsigned max_seconds)
+{
+    if (!has_random_at_start)
+        return 0;
+
+    unsigned rand = random_rand32();
+    return rand % soft_timer_s_to_ticks(max_seconds);
+}
+
 static int sensors_on(int argc, char **argv)
 {
     uint16_t delay = TIMER_DEFAULT_DELAY_SECONDS;
@@ -75,9 +86,20 @@ static int sensors_on(int argc, char **argv)
     sensors_timer.param_delay = delay;
     sensors_timer.active = 1;
 
-    unsigned first = 0;
+    unsigned first = random_delay_if_on(sensors_timer.param_delay);
     soft_timer_start(&sensors_timer.timer, first, 0);
 
+    return 0;
+}
+
+static int random_on(int argc, char **argv)
+{
+    has_random_at_start = 1;
+    return 0;
+}
+static int random_off(int argc, char **argv)
+{
+    has_random_at_start = 0;
     return 0;
 }
 
@@ -115,6 +137,8 @@ static void timer_init()
 struct shell_command commands[] = {
     {"sensors_on",          "[delay:seconds] Start sensors measure. Default 5s, min 1s", sensors_on},
     {"sensors_off",         "Stop sensors measure",              sensors_off},
+    {"random_on",           "Add a random delay before starting measures, default ON", random_on},
+    {"random_off",          "No random delay before starting measures.",               random_off},
     {NULL, NULL, NULL},
 };
 
