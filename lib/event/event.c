@@ -30,10 +30,10 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
-#include "task.h"
 
 #include "event.h"
 #include "event_priorities.h"
+#include "event_custom.h"
 #include "printf.h"
 #include "debug.h"
 
@@ -47,71 +47,90 @@
 #define EVENT_HALT_ON_POST_ERROR 1
 #endif
 
-// typedef
-typedef struct
-{
-    handler_t event;
-    handler_arg_t event_arg;
-} queue_entry_t;
-
 
 // prototypes
 static void event_task(void *param);
+static void event_queue_init(struct event_queue *e_queue);
 
 // data
-static xTaskHandle tasks[2] = {NULL, NULL};
-static xQueueHandle queues[2] = {NULL, NULL};
-static queue_entry_t current_entries[2];
+static struct event_queue *event_queues = NULL;
+static unsigned int num_event_queues = 0;
+
 
 void event_init(void)
 {
-    if (queues[0] == NULL)
-    {
-        // Create the 1st Queue
-        queues[0] = xQueueCreate(EVENT_QUEUE_LENGTH, sizeof(queue_entry_t));
+    static struct event_queue default_event_queues[2];
+    /* Default previous configuration */
+    default_event_queues[0].priority = event_priorities[0];
+    default_event_queues[0].stack_size = 4 * configMINIMAL_STACK_SIZE;
+    // DEFAULT default_event_queues[0].queue_length
 
-        if (queues[0] == NULL)
-        {
-            log_error("Failed to create the event queue #0!");
-            HALT();
-        }
+    default_event_queues[1].priority = event_priorities[1];
+    // DEFAULT default_event_queues[0].stack_size
+    // DEFAULT default_event_queues[0].queue_length
 
-        // Create the 1st task, plate its number in the param variable
-        xTaskCreate(event_task, (const signed char *) "evt0",
-                    4 * configMINIMAL_STACK_SIZE, (void *) 0,
-                    event_priorities[0], tasks);
-        log_info("Priority of event task #0: %u/%u", event_priorities[0], configMAX_PRIORITIES - 1);
+    event_init_with_queues(default_event_queues, 2);
+}
 
-        if (tasks[0] == NULL)
-        {
-            log_error("Failed to create the event task #0!");
-            HALT();
-        }
+
+void event_init_with_queues(struct event_queue *ev_queues, int num)
+{
+    if (event_queues != NULL && event_queues != ev_queues) {
+        log_warning("Event already init with different ev_queues %x:%x",
+                event_queues, ev_queues);
+        return;
     }
-    if (queues[1] == NULL)
-    {
-        // Create the 2nd Queue
-        queues[1] = xQueueCreate(EVENT_QUEUE_LENGTH, sizeof(queue_entry_t));
+    event_queues = ev_queues;
+    num_event_queues = num;
+    int i;
 
-        if (queues[1] == NULL)
-        {
-            log_error("Failed to create the event queue #1!");
-            HALT();
-        }
-
-        // Create the 2nd task, plate its number in the param variable
-        xTaskCreate(event_task, (const signed char *) "evt1",
-                    configMINIMAL_STACK_SIZE, (void *) 1,
-                    event_priorities[1], tasks + 1);
-        log_info("Priority of event task #1: %u/%u", event_priorities[1], configMAX_PRIORITIES - 1);
-
-        if (tasks[1] == NULL)
-        {
-            log_error("Failed to create the event task #1!");
-            HALT();
-        }
+    for (i = 0; i < num; i++) {
+        struct event_queue *e_queue = &event_queues[i];
+        e_queue->num = i;
+        event_queue_init(e_queue);
     }
 }
+
+
+#define DEFAULT_VALUE_IF_0(variable, value) \
+    variable = (variable ? variable : (value))
+
+
+static void event_queue_init(struct event_queue *e_queue)
+{
+    if (e_queue->queue != NULL)
+        return;
+    e_queue->current_event.event = NULL;
+    e_queue->current_event.event_arg = NULL;
+
+    // Default values
+    DEFAULT_VALUE_IF_0(e_queue->stack_size, configMINIMAL_STACK_SIZE);
+    DEFAULT_VALUE_IF_0(e_queue->queue_length, EVENT_QUEUE_LENGTH);
+
+    char name[configMAX_TASK_NAME_LEN];
+    snprintf(name, configMAX_TASK_NAME_LEN, "evt%d", e_queue->num);
+
+    e_queue->queue = xQueueCreate(e_queue->queue_length, sizeof(queue_entry_t));
+    if (e_queue->queue == NULL)
+    {
+            log_error("Failed to create the event queue #%d!", e_queue->num);
+            HALT();
+    }
+
+    xTaskCreate(event_task, (signed char *)name,
+            e_queue->stack_size, (void *) e_queue->num,
+            e_queue->priority, &e_queue->task);
+    log_info("Priority of event task #%d: %u/%u", e_queue->num,
+            e_queue->priority, configMAX_PRIORITIES - 1);
+
+    if (e_queue->task == NULL)
+    {
+        log_error("Failed to create the event task #%d!", e_queue->num);
+        HALT();
+    }
+}
+
+
 
 event_status_t event_post(event_queue_t queue, handler_t event,
                           handler_arg_t arg)
@@ -123,7 +142,7 @@ event_status_t event_post(event_queue_t queue, handler_t event,
     entry.event_arg = arg;
 
     // Send to Queue
-    if (xQueueSendToBack(queues[queue], &entry, 0) == pdTRUE)
+    if (xQueueSendToBack(event_queues[queue].queue, &entry, 0) == pdTRUE)
     {
         return EVENT_OK;
     }
@@ -149,7 +168,7 @@ event_status_t event_post_from_isr(event_queue_t queue, handler_t event,
     entry.event_arg = arg;
 
     // Send to Queue
-    if (xQueueSendToBackFromISR(queues[queue], &entry, &yield) == pdTRUE)
+    if (xQueueSendToBackFromISR(event_queues[queue].queue, &entry, &yield) == pdTRUE)
     {
         if (yield)
         {
@@ -176,8 +195,8 @@ event_status_t event_post_from_isr(event_queue_t queue, handler_t event,
 static void event_task(void *param)
 {
     uint32_t num = (uint32_t) param;
-    xQueueHandle queue = queues[num];
-    queue_entry_t *entry = current_entries + num;
+    xQueueHandle queue = event_queues[num].queue;
+    queue_entry_t *entry = &event_queues[num].current_event;
 
     // Infinite loop
     while (1)
@@ -204,14 +223,19 @@ void event_debug()
     uint32_t i;
     log_printf("Debugging Queues...\n");
 
-    for (i = EVENT_QUEUE_APPLI; i <= EVENT_QUEUE_NETWORK; i++)
+    for (i = 0; i <= num_event_queues; i++)
     {
+        struct event_queue *e_queue = &event_queues[i];
+
         log_printf("Queue #%u Current event:  %08x (%08x)", i,
-                current_entries[i].event, current_entries[i].event_arg);
-        int count = uxQueueMessagesWaiting(queues[i]);
+                e_queue->current_event.event,
+                e_queue->current_event.event_arg);
+
+        int count = uxQueueMessagesWaiting(e_queue->queue);
         log_printf(", %u waiting:\n", count);
+
         queue_entry_t e;
-        while ((xQueueReceive(queues[i], &e, 0) == pdTRUE))
+        while ((xQueueReceive(e_queue->queue, &e, 0) == pdTRUE))
         {
             log_printf("\tevt: %08x (%08x)\n", e.event, e.event_arg);
         }
