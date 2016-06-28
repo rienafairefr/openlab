@@ -90,7 +90,9 @@ enum
     NVIC_IRQ_LINE_DMA2_CH1           = 56,
     NVIC_IRQ_LINE_DMA2_CH2           = 57,
     NVIC_IRQ_LINE_DMA2_CH3           = 58,
-    NVIC_IRQ_LINE_DMA2_CH4_5         = 59
+    NVIC_IRQ_LINE_DMA2_CH4_5         = 59,
+
+    NVIC_IRQ_MAX_NUMBER_LINE         = 60,
 };
 
 #define NVIC_IRQ_LINE_USB NVIC_IRQ_LINE_USB_LP_CAN1_RX0
