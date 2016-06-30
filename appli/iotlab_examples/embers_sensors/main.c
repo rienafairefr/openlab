@@ -65,7 +65,7 @@ static int sensors_handler(handler_arg_t arg)
     printf("{");
     printf("\"temperature\":%f,", 42.5 + temp / 480.0);
     printf("\"luminosity\":%f,", lum);
-    printf("\"pressure\":%f\"", pres / 4096.0 ); // No comma at the end
+    printf("\"pressure\":%f", pres / 4096.0 ); // No comma at the end
     printf("}\n");
 
     return soft_timer_s_to_ticks(timer->param_delay);
