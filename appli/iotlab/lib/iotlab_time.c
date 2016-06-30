@@ -18,13 +18,9 @@ void iotlab_time_set_time(struct soft_timer_timeval *t0,
     unix_time_ref = *time_ref;
 }
 
-void iotlab_time_extend_relative(struct soft_timer_timeval *time,
-        uint32_t timer_tick)
-{
-    /* extend timer_tick to timeval */
-    *time = soft_timer_time_extended();
-    get_absolute_time(time, timer_tick, time->tv_sec);
 
+static void iotlab_time_convert(struct soft_timer_timeval *time)
+{
     /* Set time relative to time0 */
     time->tv_sec -= time0.tv_sec;
     if (time->tv_usec < time0.tv_usec) {
@@ -42,6 +38,16 @@ void iotlab_time_extend_relative(struct soft_timer_timeval *time,
         time->tv_sec  += 1;
         time->tv_usec -= 1000000;
     }
+}
+
+
+void iotlab_time_extend_relative(struct soft_timer_timeval *time,
+        uint32_t timer_tick)
+{
+    /* extend timer_tick to timeval */
+    *time = soft_timer_time_extended();
+    get_absolute_time(time, timer_tick, time->tv_sec);
+    iotlab_time_convert(time);
 }
 
 
