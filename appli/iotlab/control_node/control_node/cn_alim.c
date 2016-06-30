@@ -17,8 +17,8 @@ static struct {
     .post_start_cmd = NULL,
 };
 
-static int32_t on_start(uint8_t cmd_type, packet_t *pkt);
-static int32_t on_stop(uint8_t cmd_type, packet_t *pkt);
+static int32_t on_start(uint8_t cmd_type, iotlab_packet_t *pkt);
+static int32_t on_stop(uint8_t cmd_type, iotlab_packet_t *pkt);
 
 void cn_alim_start()
 {
@@ -42,8 +42,9 @@ void cn_alim_config(void (*pre_stop_cmd)(), void (*post_start_cmd)())
     cn_alim.post_start_cmd = post_start_cmd;
 }
 
-static int32_t on_start(uint8_t cmd_type, packet_t *pkt)
+static int32_t on_start(uint8_t cmd_type, iotlab_packet_t *packet)
 {
+    packet_t *pkt = (packet_t *)packet;
     if (1 != pkt->length)
         return 1;
 
@@ -68,8 +69,9 @@ static int32_t on_start(uint8_t cmd_type, packet_t *pkt)
     return 0;
 }
 
-static int32_t on_stop(uint8_t cmd_type, packet_t *pkt)
+static int32_t on_stop(uint8_t cmd_type, iotlab_packet_t *packet)
 {
+    packet_t *pkt = (packet_t *)packet;
     if (1 != pkt->length)
         return 1;
 

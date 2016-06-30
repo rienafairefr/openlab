@@ -30,7 +30,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include "packet.h"
+#include "iotlab_packet.h"
 
 enum {
     /** Offset to use when allocating a packet (for header) */
@@ -50,25 +50,26 @@ void iotlab_serial_start(uint32_t baudrate);
 /** Set the packet type for log packets */
 void iotlab_serial_set_logger_byte(uint8_t logger_type_byte);
 
+/**
+ * The handler receives a packet with data contained in it, and should update
+ * the same packet with the response.
+ *
+ * It should return 0 if command processed successfully or 1 on error.
+ */
+typedef int32_t(*iotlab_serial_handler)(uint8_t cmd_type, iotlab_packet_t *pkt);
+
 typedef struct {
     /** The command type for which the handler should be called */
     uint8_t cmd_type;
-    /**
-     * The handler function called on each command received with matching type.
-     *
-     * The handler receives a packet with data contained in it, and should
-     * update the same packet with the response.
-     *
-     * The handler should return 1 if command processed successfully or 0 if an
-     * error occurred.
-     */
-    int32_t (*handler)(uint8_t cmd_type, packet_t *pkt);
+
+    /** The handler function called on command received with matching type. */
+    iotlab_serial_handler handler;
 
     /** Next pointer to chain list */
     void* next;
 } iotlab_serial_handler_t;
 
-packet_t *iotlab_serial_packet_alloc(void);
+iotlab_packet_t *iotlab_serial_packet_alloc(iotlab_packet_queue_t *queue);
 
 /**
  * Register a serial handler.
@@ -88,13 +89,12 @@ void iotlab_serial_register_handler(iotlab_serial_handler_t *handler);
  * \param pkt a pointer to the packet to send. It will be freed if sent successfully.
  * \return 0 if packet sent OK, 1 if an error occurred.
  */
-int32_t iotlab_serial_send_frame(uint8_t type, packet_t *pkt);
+int32_t iotlab_serial_send_frame(uint8_t type, iotlab_packet_t *pkt);
 
 
-/**
- * Append data in the serial packet
- */
-void iotlab_serial_append_data(packet_t *pkt, void *data, size_t size);
+
+int32_t iotlab_serial_packet_free_space(iotlab_packet_t *packet);
+
 
 
 #endif /* IOTLAB_SERIAL_H_*/

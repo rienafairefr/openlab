@@ -1,12 +1,22 @@
 #include "iotlab_serial.h"
 #include "cn_logger.h"
 
-packet_t *cn_logger_pkt = NULL;
+static void cn_logger_packet_free(iotlab_packet_t *packet);
 
-/* Alloc a pkt if necessary and return it */
-void cn_logger_reset()
+static iotlab_packet_t pkt;
+iotlab_packet_t *cn_logger_pkt = NULL;
+
+void cn_logger_start()
 {
-    if (!cn_logger_pkt)
-        cn_logger_pkt = packet_alloc(IOTLAB_SERIAL_HEADER_SIZE);
+    // Not using a fifo, so custom 'free' function
+    pkt.free = cn_logger_packet_free;
+    pkt.free(&pkt);
+}
+
+
+static void cn_logger_packet_free(iotlab_packet_t *packet)
+{
+    packet_reset((packet_t *)packet, IOTLAB_SERIAL_HEADER_SIZE);
+    cn_logger_pkt = packet;
 }
 

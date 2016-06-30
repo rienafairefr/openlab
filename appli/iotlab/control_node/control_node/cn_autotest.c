@@ -6,9 +6,9 @@
 #include "constants.h"
 #include "cn_autotest.h"
 
-static int32_t gpio(uint8_t cmd_type, packet_t *pkt);
-static int32_t tst_i2c2(uint8_t cmd_type, packet_t *pkt);
-static int32_t ping_pong(uint8_t cmd_type, packet_t *pkt);
+static int32_t gpio(uint8_t cmd_type, iotlab_packet_t *pkt);
+static int32_t tst_i2c2(uint8_t cmd_type, iotlab_packet_t *pkt);
+static int32_t ping_pong(uint8_t cmd_type, iotlab_packet_t *pkt);
 
 
 void cn_autotest_start()
@@ -34,8 +34,10 @@ void cn_autotest_start()
 }
 
 
-int32_t ping_pong(uint8_t cmd_type, packet_t *pkt)
+int32_t ping_pong(uint8_t cmd_type, iotlab_packet_t *packet)
 {
+    packet_t *pkt = (packet_t *)packet;
+
     if (3 != pkt->length)
         return 1;
     if (START == pkt->data[0])
@@ -45,18 +47,18 @@ int32_t ping_pong(uint8_t cmd_type, packet_t *pkt)
     return 0;
 }
 
-int32_t gpio(uint8_t cmd_type, packet_t *pkt)
+int32_t gpio(uint8_t cmd_type, iotlab_packet_t *packet)
 {
-    if (START == pkt->data[0])
+    if (START == ((packet_t *)packet)->data[0])
         cn_test_gpio_start();
     else
         cn_test_gpio_stop();
     return 0;
 }
 
-int32_t tst_i2c2(uint8_t cmd_type, packet_t *pkt)
+int32_t tst_i2c2(uint8_t cmd_type, iotlab_packet_t *packet)
 {
-    if (START == pkt->data[0])
+    if (START == ((packet_t *)packet)->data[0])
         cn_test_i2c2_start();
     else
         cn_test_i2c2_stop();

@@ -23,7 +23,6 @@
  *  Created on: Aug 12, 2013
  *      Author: burindes
  */
-#include <string.h>
 #include "platform.h"
 #include "iotlab_leds.h"
 #include "iotlab_serial.h"
@@ -59,6 +58,11 @@ static void send_now(handler_arg_t arg);
 static void tx_done_isr(handler_arg_t arg);
 #endif // ASYNCHRONOUS
 
+
+// Two should be enough for commands,
+#define IOTLAB_SERIAL_NUM_RX_PKTS (2)
+
+
 /** */
 static void handle_packet_sent(handler_arg_t arg);
 
@@ -68,10 +72,10 @@ static struct {
     /** Structure holding the TX information */
     struct {
         /** The FIFO of packets to send */
-        packet_t *fifo;
+        iotlab_packet_queue_t fifo;
 
         /** The packet in TX. NULL if idle */
-        packet_t *pkt;
+        iotlab_packet_t *pkt;
 
         /** Flag to indicate end of asynchronous TX */
         volatile uint32_t irq_triggered;
@@ -80,10 +84,13 @@ static struct {
     /** Structure holding RX information */
     struct {
         /** The packet being received */
-        packet_t * volatile rx_pkt;
+        iotlab_packet_t * volatile rx_pkt;
 
         /** The complete received packet */
-        packet_t * volatile ready_pkt;
+        iotlab_packet_t * volatile ready_pkt;
+
+        iotlab_packet_t packets[IOTLAB_SERIAL_NUM_RX_PKTS];
+        iotlab_packet_queue_t queue;
     } rx;
 
     uint8_t logger_type_byte;
@@ -92,14 +99,15 @@ static struct {
 
 void iotlab_serial_start(uint32_t baudrate)
 {
-    packet_init();
     uart_enable(uart_external, baudrate);
+    iotlab_packet_init_queue(&ser.rx.queue,
+            ser.rx.packets, IOTLAB_SERIAL_NUM_RX_PKTS);
 
     // Clear the first handler
     ser.first_handler = NULL;
 
     // Clear RX/TX structures
-    ser.tx.fifo = NULL;
+    iotlab_packet_init_queue(&ser.tx.fifo, NULL, 0);
     ser.tx.pkt = NULL;
     ser.tx.irq_triggered = 0;
 
@@ -126,8 +134,10 @@ void iotlab_serial_register_handler(iotlab_serial_handler_t *handler)
     ser.first_handler = handler;
 }
 
-static int32_t iotlab_serial_init_tx_packet(uint8_t type, packet_t *pkt)
+static int32_t iotlab_serial_init_tx_packet(uint8_t type,
+        iotlab_packet_t *packet)
 {
+    packet_t *pkt = (packet_t *)packet;
     if (pkt->length > _PAYLOAD_MAX) {
         leds_on(RED_LED);
         return 1;  // pkt too long
@@ -145,26 +155,32 @@ static int32_t iotlab_serial_init_tx_packet(uint8_t type, packet_t *pkt)
     return 0;
 }
 
-int32_t iotlab_serial_send_frame(uint8_t type, packet_t *pkt)
+int32_t iotlab_serial_send_frame(uint8_t type, iotlab_packet_t *pkt)
 {
     int32_t ret = iotlab_serial_init_tx_packet(type, pkt);
     if (ret)
         return ret;
 
-    // Append to FIFO
-    packet_fifo_append(&ser.tx.fifo, pkt);
+    iotlab_packet_fifo_prio_append(&ser.tx.fifo, pkt);
 
     send_now(NULL);
     return 0;
 }
 
-packet_t *iotlab_serial_packet_alloc()
+iotlab_packet_t *iotlab_serial_packet_alloc(iotlab_packet_queue_t *queue)
 {
-    return packet_alloc(IOTLAB_SERIAL_HEADER_SIZE);
+    return iotlab_packet_alloc(queue, IOTLAB_SERIAL_HEADER_SIZE);
+}
+
+
+int32_t iotlab_serial_packet_free_space(iotlab_packet_t *packet)
+{
+    return IOTLAB_SERIAL_DATA_MAX_SIZE - ((packet_t *)packet)->length;
 }
 
 static void char_rx(handler_arg_t arg, uint8_t c)
 {
+    packet_t *pkt;
     /*
      * HIGH PRIORITY Interrupt
      *
@@ -172,6 +188,7 @@ static void char_rx(handler_arg_t arg, uint8_t c)
      */
     static uint16_t rx_index = 0;
     static uint32_t last_start_time = 0;
+    uint32_t timestamp = soft_timer_time();
 
     // Check for ready buffer
     if (ser.rx.rx_pkt == NULL)
@@ -180,11 +197,12 @@ static void char_rx(handler_arg_t arg, uint8_t c)
         rx_index = 0;
         return;
     }
+    pkt = (packet_t *)ser.rx.rx_pkt;
 
     // Check if packet started too long ago
     if (last_start_time
-            && (soft_timer_time() - last_start_time
-                    > soft_timer_ms_to_ticks(100)))
+            && (timestamp - last_start_time
+                > soft_timer_ms_to_ticks(100)))
     {
         // Reset index
         rx_index = 0;
@@ -198,11 +216,14 @@ static void char_rx(handler_arg_t arg, uint8_t c)
             if (c != SYNC_BYTE)
                 return;  // Abort
             // Store time
-            last_start_time = soft_timer_time();
+            last_start_time = timestamp;
+
+            // Rx start timestamp
+            ser.rx.rx_pkt->timestamp = timestamp;
             break;
         case 1:
             // length byte
-            ser.rx.rx_pkt->length = 2 + c;
+            pkt->length = 2 + c;
             break;
         default:
             // Proceed
@@ -210,7 +231,7 @@ static void char_rx(handler_arg_t arg, uint8_t c)
     }
 
     // Save byte
-    ser.rx.rx_pkt->raw_data[rx_index] = c;
+    pkt->raw_data[rx_index] = c;
 
     // Increment
     rx_index++;
@@ -219,7 +240,7 @@ static void char_rx(handler_arg_t arg, uint8_t c)
         return;
 
     // Check length
-    if (rx_index == ser.rx.rx_pkt->length) {
+    if (rx_index == pkt->length) {
         // Reset index
         rx_index = 0;
         last_start_time = 0;
@@ -256,7 +277,7 @@ static void allocate_rx_packet(handler_arg_t arg)
 {
     // Allocate a new packet for RX
     if (ser.rx.rx_pkt == NULL)
-        ser.rx.rx_pkt = iotlab_serial_packet_alloc();
+        ser.rx.rx_pkt = iotlab_serial_packet_alloc(&ser.rx.queue);
 }
 
 static void packet_received(handler_arg_t arg)
@@ -267,7 +288,7 @@ static void packet_received(handler_arg_t arg)
     allocate_rx_packet(NULL);
 
     // Get the ready packet
-    rx_pkt = ser.rx.ready_pkt;
+    rx_pkt = (packet_t *)ser.rx.ready_pkt;
 
     // Prepare packets for next RX
     ser.rx.ready_pkt = NULL;
@@ -286,7 +307,7 @@ static void packet_received(handler_arg_t arg)
     while (handler != NULL) {
         if (handler->cmd_type == cmd_type) {
             // Found! process
-            result = handler->handler(cmd_type, rx_pkt);
+            result = handler->handler(cmd_type, (iotlab_packet_t *)rx_pkt);
             break;
         }
         // Increment
@@ -298,27 +319,35 @@ static void packet_received(handler_arg_t arg)
     rx_pkt->length = 1;
     rx_pkt->data[0] = ((0 == result) ? ACK : NACK);
 
-    iotlab_serial_send_frame(cmd_type, rx_pkt);
+    iotlab_serial_send_frame(cmd_type, (iotlab_packet_t *)rx_pkt);
     // auto clean of packets
 }
 
 /* Start sending packets if lib was idle */
 static void send_now(handler_arg_t arg)
 {
+    packet_t *pkt;
     if (ser.tx.pkt)
         return;  // Uart Send active, tx.fifo will be handled asyncronously
 
     // Try to get a frame from the FIFO
-    ser.tx.pkt = packet_fifo_get(&ser.tx.fifo);
-    if (ser.tx.pkt == NULL)
+    if (iotlab_packet_fifo_count(&ser.tx.fifo) == 0)
         return;  // nothing to send
+
+    // Only one reader so it's safe, it won't block
+    ser.tx.pkt = iotlab_packet_fifo_get(&ser.tx.fifo);
+
+    pkt = (packet_t *)ser.tx.pkt;
+
+    // Tx start timestamp
+    ser.tx.pkt->timestamp = soft_timer_time();
 
     // Start sending the packet
 #if ASYNCHRONOUS
-    uart_transfer_async(uart_external, ser.tx.pkt->raw_data, ser.tx.pkt->length,
+    uart_transfer_async(uart_external, pkt->raw_data, pkt->length,
             tx_done_isr, NULL);
 #else // ASYNCHRONOUS
-    uart_transfer(uart_external, ser.tx.pkt->raw_data, ser.tx.pkt->length);
+    uart_transfer(uart_external, pkt->raw_data, pkt->length);
     event_post(EVENT_QUEUE_APPLI, handle_packet_sent, NULL);
 #endif // ASYNCHRONOUS
 }
@@ -340,17 +369,11 @@ static void handle_packet_sent(handler_arg_t arg)
     }
 
     // Free the packet
-    packet_free(ser.tx.pkt);
+    iotlab_packet_call_free(ser.tx.pkt);
 
     // Clear the TX busy flag
     ser.tx.pkt = NULL;
     ser.tx.irq_triggered = 0;
 
     send_now(NULL);
-}
-
-void iotlab_serial_append_data(packet_t *pkt, void *data, size_t size)
-{
-    memcpy(&pkt->data[pkt->length], data, size);
-    pkt->length += size;
 }

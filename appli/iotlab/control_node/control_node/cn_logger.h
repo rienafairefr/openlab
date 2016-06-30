@@ -3,19 +3,17 @@
 
 #include <string.h>
 #include "printf.h"
-#include "packet.h"
+#include "iotlab_packet.h"
 #include "constants.h"
 
-extern packet_t *cn_logger_pkt;
+extern iotlab_packet_t *cn_logger_pkt;
 
-/** Alloc the cn_logger internal pkt */
-void cn_logger_reset();
+void cn_logger_start();
 
 /** Send logger message */
 #define cn_logger(level, msg, args...) do {                                    \
                                                                                \
-    cn_logger_reset();                                                         \
-    packet_t *pkt = cn_logger_pkt;                                             \
+    packet_t *pkt = (packet_t *)cn_logger_pkt;                                 \
     if (pkt == NULL)                                                           \
         break;                                                                 \
                                                                                \
@@ -24,10 +22,9 @@ void cn_logger_reset();
             (msg) , ##args);                                                   \
     pkt->length = 2 + strlen((char *)&pkt->data[1]);                           \
                                                                                \
-    if (0 == iotlab_serial_send_frame(LOGGER_FRAME, pkt))                      \
-        cn_logger_pkt = NULL;  /* Success */                                   \
-                                                                               \
-    cn_logger_reset();                                                         \
+    cn_logger_pkt = NULL;                                                      \
+    if (iotlab_serial_send_frame(LOGGER_FRAME, (iotlab_packet_t *)pkt))        \
+        cn_logger_pkt = (iotlab_packet_t *)pkt;  /* Failed, restore packet */  \
                                                                                \
 } while (0);
 
