@@ -59,9 +59,8 @@ static void tx_done_isr(handler_arg_t arg);
 #endif // ASYNCHRONOUS
 
 
-// In fact two should be enough for commands,
-// Add packets for measures, retro compat
-#define IOTLAB_SERIAL_NUM_RX_PKTS (2 + 20)
+// Two should be enough for commands,
+#define IOTLAB_SERIAL_NUM_RX_PKTS (2)
 
 
 /** */

@@ -43,6 +43,7 @@ int main()
     iotlab_serial_start(500000);
 
     // Start the application libs
+    cn_logger_start();
     cn_control_start();
 
 #ifdef IOTLAB_CN
@@ -54,7 +55,6 @@ int main()
 #endif
 
     cn_radio_start();
-    cn_logger_reset();
 
 #ifdef IOTLAB_CN
     //set the open node power to off and disable battery charge

@@ -36,10 +36,21 @@ struct consumption_config {
     uint32_t meas_period_us;
 #endif
 
-
     iotlab_packet_t *pkt;
     uint32_t t_ref_s;
 };
+
+#define MEASURES_PRIORITY 0
+
+#define CN_CONSO_NUM_PKTS (8)
+#define CN_CONSO_NUM_ACKS (2)
+
+iotlab_packet_t meas_pkts[CN_CONSO_NUM_PKTS];
+iotlab_packet_queue_t measures_queue;
+
+iotlab_packet_t acks_pkts[CN_CONSO_NUM_ACKS];
+iotlab_packet_queue_t acks_queue;
+
 
 static struct consumption_config cur_config = {0};
 
@@ -61,13 +72,16 @@ static uint16_t tab_ina226_average[8] = {
 
 
 
-
 static void consumption_measure_handler(handler_arg_t arg,
         float v, float c, float p, uint32_t measure_time);
 
 
 void cn_consumption_start()
 {
+
+    iotlab_packet_init_queue(&measures_queue, meas_pkts, CN_CONSO_NUM_PKTS);
+    iotlab_packet_init_queue(&acks_queue, acks_pkts, CN_CONSO_NUM_ACKS);
+
     // Stop sampling
     fiteco_lib_gwt_current_monitor_stop();
 
@@ -239,7 +253,7 @@ static void consumption_measure_handler(handler_arg_t arg,
         /*
          * alloc and init a new packet
          */
-        packet = _iotlab_serial_packet_alloc();
+        packet = iotlab_serial_packet_alloc(&measures_queue);
         if (NULL == packet)
             return;  // alloc failed, drop this measure
 
@@ -301,7 +315,7 @@ static void consumption_measure_handler(handler_arg_t arg,
 
 static iotlab_packet_t *alloc_pw_ack_frame(uint8_t pw_config)
 {
-    iotlab_packet_t *packet = _iotlab_serial_packet_alloc();
+    iotlab_packet_t *packet = iotlab_serial_packet_alloc(&acks_queue);
 
     if (packet) {
         ((packet_t *)packet)->data[0] = CONFIG_CONSUMPTION;

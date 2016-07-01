@@ -36,6 +36,8 @@ enum {
     SEC = 1000000,
 };
 
+#define MEASURES_PRIORITY 0
+#define CN_RADIO_NUM_PKTS (8)
 
 static struct
 {
@@ -43,6 +45,9 @@ static struct
 
     uint32_t channels;
     uint32_t current_channel;
+
+    iotlab_packet_t meas_pkts[CN_RADIO_NUM_PKTS];
+    iotlab_packet_queue_t measures_queue;
 
     uint32_t num_operations_per_channel;
     uint8_t  current_op_num_on_channel;
@@ -82,6 +87,9 @@ static struct
 
 void cn_radio_start()
 {
+    iotlab_packet_init_queue(&radio.measures_queue,
+            radio.meas_pkts, CN_RADIO_NUM_PKTS);
+
     // Set the handlers
     static iotlab_serial_handler_t handler_off = {
         .cmd_type = CONFIG_RADIO_STOP,
@@ -252,7 +260,7 @@ static void poll_time(handler_arg_t arg)
 
     if (NULL == radio.rssi.serial_pkt) {
         /* alloc and init new packet */
-        packet = _iotlab_serial_packet_alloc();
+        packet = iotlab_serial_packet_alloc(&radio.measures_queue);
         if (NULL == packet)
             return;  // FAIL: drop measure
 
@@ -405,7 +413,7 @@ static void sniff_handle_rx_appli_queue(handler_arg_t arg)
     if (status != PHY_SUCCESS)
         return;
 
-    iotlab_packet_t *packet = _iotlab_serial_packet_alloc();
+    iotlab_packet_t *packet = iotlab_serial_packet_alloc(&radio.measures_queue);
     if (packet == NULL)
         return;
 

@@ -13,9 +13,13 @@
 #include "cn_consumption.h"
 #include "cn_radio.h"
 
+#define CN_CONTROL_NUM_ACKS (2)
+
 static struct {
 
     uint16_t node_id;
+    iotlab_packet_t acks_pkts[CN_CONTROL_NUM_ACKS];
+    iotlab_packet_queue_t acks_queue;
 
 
 } cn_control = {
@@ -36,6 +40,9 @@ static int32_t green_led_on(uint8_t cmd_type, iotlab_packet_t *pkt);
 
 void cn_control_start()
 {
+    iotlab_packet_init_queue(&cn_control.acks_queue,
+            cn_control.acks_pkts, CN_CONTROL_NUM_ACKS);
+
     // Configure and register all handlers
     // set_time
     static iotlab_serial_handler_t handler_set_time = {
@@ -83,14 +90,16 @@ static int32_t set_time(uint8_t cmd_type, iotlab_packet_t *packet)
     memcpy(&set_time_aux.unix_time, pkt->data, pkt->length);
 
     /* alloc the ack frame */
-    iotlab_packet_t *ack_pkt = _iotlab_serial_packet_alloc();
+    iotlab_packet_t *ack_pkt = iotlab_serial_packet_alloc(&cn_control.acks_queue);
     if (!ack_pkt)
         return 1;
     ((packet_t *)ack_pkt)->data[0] = SET_TIME;
     ((packet_t *)ack_pkt)->length = 1;
 
-    if (event_post(EVENT_QUEUE_APPLI, do_set_time, ack_pkt))
+    if (event_post(EVENT_QUEUE_APPLI, do_set_time, ack_pkt)) {
+        iotlab_packet_call_free(ack_pkt);
         return 1;
+    }
 
     return 0;
 }
