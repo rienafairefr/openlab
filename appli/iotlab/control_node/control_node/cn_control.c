@@ -40,14 +40,14 @@ void cn_control_start()
     // set_time
     static iotlab_serial_handler_t handler_set_time = {
         .cmd_type = SET_TIME,
-        .handler = set_time,
+        .handler = (iotlab_serial_handler)set_time,
     };
     iotlab_serial_register_handler(&handler_set_time);
 
     // set_node_id
     static iotlab_serial_handler_t handler_set_node_id = {
         .cmd_type = SET_NODE_ID,
-        .handler = set_node_id,
+        .handler = (iotlab_serial_handler)set_node_id,
     };
     iotlab_serial_register_handler(&handler_set_node_id);
 
@@ -55,12 +55,12 @@ void cn_control_start()
     // green led control
     static iotlab_serial_handler_t handler_green_led_blink = {
         .cmd_type = GREEN_LED_BLINK,
-        .handler = green_led_blink,
+        .handler = (iotlab_serial_handler)green_led_blink,
     };
     iotlab_serial_register_handler(&handler_green_led_blink);
     static iotlab_serial_handler_t handler_green_led_on = {
         .cmd_type = GREEN_LED_ON,
-        .handler = green_led_on,
+        .handler = (iotlab_serial_handler)green_led_on,
     };
     iotlab_serial_register_handler(&handler_green_led_on);
 }
@@ -81,7 +81,7 @@ static int32_t set_time(uint8_t cmd_type, packet_t *pkt)
     memcpy(&set_time_aux.unix_time, pkt->data, pkt->length);
 
     /* alloc the ack frame */
-    packet_t *ack_pkt = iotlab_serial_packet_alloc();
+    packet_t *ack_pkt = _iotlab_serial_packet_alloc();
     if (!ack_pkt)
         return 1;
     ack_pkt->data[0] = SET_TIME;
@@ -106,8 +106,8 @@ static void do_set_time(handler_arg_t arg)
     flush_current_rssi_measures();
 
     // Send the update frame
-    if (iotlab_serial_send_frame(ACK_FRAME, ack_pkt)) {
-        packet_free(ack_pkt);
+    if (iotlab_serial_send_frame(ACK_FRAME, (iotlab_packet_t *)ack_pkt)) {
+        iotlab_packet_call_free((iotlab_packet_t *)ack_pkt);
         return;
     }
 

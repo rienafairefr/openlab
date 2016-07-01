@@ -7,6 +7,6 @@ packet_t *cn_logger_pkt = NULL;
 void cn_logger_reset()
 {
     if (!cn_logger_pkt)
-        cn_logger_pkt = packet_alloc(IOTLAB_SERIAL_HEADER_SIZE);
+        cn_logger_pkt = _iotlab_serial_packet_alloc();
 }
 

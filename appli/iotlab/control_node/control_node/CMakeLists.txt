@@ -22,7 +22,6 @@ if(${PLATFORM_HAS_INA226})
         )
     target_link_libraries(control_node
         platform
-        packet
         fiteco_lib_gwt
         iotlab_autotest_cn
         iotlab_i2c_slave
@@ -43,7 +42,6 @@ if (PLATFORM STREQUAL "iotlab-m3")
         )
 target_link_libraries(control_node_m3
         platform
-        packet
         iotlab_serial
         iotlab_time
         iotlab_leds_util

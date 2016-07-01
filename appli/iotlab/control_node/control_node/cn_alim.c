@@ -26,12 +26,12 @@ void cn_alim_start()
 
     static iotlab_serial_handler_t handler_start = {
         .cmd_type = OPEN_NODE_START,
-        .handler = on_start,
+        .handler = (iotlab_serial_handler)on_start,
     };
     iotlab_serial_register_handler(&handler_start);
     static iotlab_serial_handler_t handler_stop = {
         .cmd_type = OPEN_NODE_STOP,
-        .handler = on_stop,
+        .handler = (iotlab_serial_handler)on_stop,
     };
     iotlab_serial_register_handler(&handler_stop);
 }

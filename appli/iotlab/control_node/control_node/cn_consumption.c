@@ -73,7 +73,7 @@ void cn_consumption_start()
     // Set configure handler
     static iotlab_serial_handler_t handler_config_consumption = {
         .cmd_type = CONFIG_CONSUMPTION,
-        .handler = config_consumption_measures,
+        .handler = (iotlab_serial_handler)config_consumption_measures,
     };
     iotlab_serial_register_handler(&handler_config_consumption);
 }
@@ -201,12 +201,12 @@ static void do_config_consumption_measures(handler_arg_t arg)
     flush_current_consumption_measures();
 
     /* Send the update frame */
-    if (iotlab_serial_send_frame(ACK_FRAME, conf->pkt)) {
+    if (iotlab_serial_send_frame(ACK_FRAME, (iotlab_packet_t *)conf->pkt)) {
         // ERF that's really bad, config failed
         // send ERROR NOW TODO
         leds_on(RED_LED);
         cn_logger(LOGGER_ERROR, "Invalid ack pkt for consumption");
-        packet_free(conf->pkt);
+        iotlab_packet_call_free((iotlab_packet_t *)conf->pkt);
         return;
     }
     /* Gateway will now be able to receive new packets */
@@ -236,7 +236,7 @@ static void consumption_measure_handler(handler_arg_t arg,
         /*
          * alloc and init a new packet
          */
-        pkt = iotlab_serial_packet_alloc();
+        pkt = _iotlab_serial_packet_alloc();
         if (NULL == pkt)
             return;  // alloc failed, drop this measure
 
@@ -299,7 +299,7 @@ static void consumption_measure_handler(handler_arg_t arg,
 
 static packet_t *alloc_pw_ack_frame(uint8_t pw_config)
 {
-    packet_t *pkt = iotlab_serial_packet_alloc();
+    packet_t *pkt = _iotlab_serial_packet_alloc();
 
     if (pkt) {
         pkt->data[0] = CONFIG_CONSUMPTION;
@@ -315,8 +315,8 @@ void flush_current_consumption_measures()
 
     if (NULL == pkt)
         return;
-    if (iotlab_serial_send_frame(CONSUMPTION_FRAME, pkt))
-        packet_free(pkt);  // send fail
+    if (iotlab_serial_send_frame(CONSUMPTION_FRAME, (iotlab_packet_t *)pkt))
+        iotlab_packet_call_free((iotlab_packet_t *)pkt);  // send fail
 
     cur_config.pkt = NULL;
 }

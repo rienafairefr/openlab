@@ -6,6 +6,7 @@ include_directories(
     )
 
 add_library(iotlab_serial     STATIC iotlab_serial)
+target_link_libraries(iotlab_serial iotlab_packet)
 add_library(iotlab_time       STATIC iotlab_time)
 add_library(iotlab_leds_util  STATIC iotlab_leds_util)
 add_library(iotlab_packet     STATIC iotlab_packet)

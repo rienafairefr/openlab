@@ -16,19 +16,19 @@ void cn_autotest_start()
     // Configure and register all handlers
     static iotlab_serial_handler_t handler_pingpong = {
         .cmd_type = TEST_RADIO_PING_PONG,
-        .handler = ping_pong,
+        .handler = (iotlab_serial_handler)ping_pong,
     };
     iotlab_serial_register_handler(&handler_pingpong);
 
     static iotlab_serial_handler_t handler_gpio = {
         .cmd_type = TEST_GPIO,
-        .handler = gpio,
+        .handler = (iotlab_serial_handler)gpio,
     };
     iotlab_serial_register_handler(&handler_gpio);
 
     static iotlab_serial_handler_t handler_i2c2 = {
         .cmd_type = TEST_I2C2,
-        .handler = tst_i2c2,
+        .handler = (iotlab_serial_handler)tst_i2c2,
     };
     iotlab_serial_register_handler(&handler_i2c2);
 }

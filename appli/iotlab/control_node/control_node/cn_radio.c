@@ -85,19 +85,19 @@ void cn_radio_start()
     // Set the handlers
     static iotlab_serial_handler_t handler_off = {
         .cmd_type = CONFIG_RADIO_STOP,
-        .handler = radio_off,
+        .handler = (iotlab_serial_handler)radio_off,
     };
     iotlab_serial_register_handler(&handler_off);
 
     static iotlab_serial_handler_t handler_polling = {
         .cmd_type = CONFIG_RADIO_MEAS,
-        .handler = radio_polling,
+        .handler = (iotlab_serial_handler)radio_polling,
     };
     iotlab_serial_register_handler(&handler_polling);
 
     static iotlab_serial_handler_t handler_sniffer = {
         .cmd_type = CONFIG_RADIO_SNIFFER,
-        .handler = radio_sniffer,
+        .handler = (iotlab_serial_handler)radio_sniffer,
     };
     iotlab_serial_register_handler(&handler_sniffer);
 
@@ -122,8 +122,8 @@ void flush_current_rssi_measures()
 
     if (NULL == pkt)
         return;
-    if (iotlab_serial_send_frame(RADIO_MEAS_FRAME, pkt))
-        packet_free(pkt);  // send fail
+    if (iotlab_serial_send_frame(RADIO_MEAS_FRAME, (iotlab_packet_t *)pkt))
+        iotlab_packet_call_free((iotlab_packet_t *)pkt);  // send fail
 
     radio.rssi.serial_pkt = NULL;
 }
@@ -250,7 +250,7 @@ static void poll_time(handler_arg_t arg)
 
     if (NULL == radio.rssi.serial_pkt) {
         /* alloc and init new packet */
-        pkt = iotlab_serial_packet_alloc();
+        pkt = _iotlab_serial_packet_alloc();
         if (NULL == pkt)
             return;  // FAIL: drop measure
 
@@ -390,7 +390,7 @@ static void sniff_handle_rx_appli_queue(handler_arg_t arg)
     if (status != PHY_SUCCESS)
         return;
 
-    packet_t *serial_pkt = iotlab_serial_packet_alloc();
+    packet_t *serial_pkt = _iotlab_serial_packet_alloc();
     if (serial_pkt == NULL)
         return;
 
@@ -406,8 +406,8 @@ static void sniff_handle_rx_appli_queue(handler_arg_t arg)
     serial_pkt->length = to_zep(serial_pkt->data, rx_pkt,
             radio.current_channel, cn_control_node_id());
 
-    if (iotlab_serial_send_frame(RADIO_SNIFFER_FRAME, serial_pkt))
-        packet_free(serial_pkt);
+    if (iotlab_serial_send_frame(RADIO_SNIFFER_FRAME, (iotlab_packet_t *)serial_pkt))
+        iotlab_packet_call_free((iotlab_packet_t *)serial_pkt);
 }
 
 
