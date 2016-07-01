@@ -37,17 +37,18 @@ struct consumption_config {
 #endif
 
 
-    packet_t *pkt;
+    iotlab_packet_t *pkt;
     uint32_t t_ref_s;
 };
 
 static struct consumption_config cur_config = {0};
 
 
-static int32_t config_consumption_measures(uint8_t cmd_type, packet_t *pkt);
+static int32_t config_consumption_measures(uint8_t cmd_type,
+        iotlab_packet_t *packet);
 static void do_config_consumption_measures(handler_arg_t arg);
 
-static packet_t *alloc_pw_ack_frame(uint8_t cons_config);
+static iotlab_packet_t *alloc_pw_ack_frame(uint8_t cons_config);
 
 #if 0
 static uint16_t tab_ina226_period[8] = {
@@ -73,22 +74,22 @@ void cn_consumption_start()
     // Set configure handler
     static iotlab_serial_handler_t handler_config_consumption = {
         .cmd_type = CONFIG_CONSUMPTION,
-        .handler = (iotlab_serial_handler)config_consumption_measures,
+        .handler = config_consumption_measures,
     };
     iotlab_serial_register_handler(&handler_config_consumption);
 }
 
 
-static int parse_consumption_config(packet_t *pkt,
+static int parse_consumption_config(uint8_t *data,
         struct consumption_config *conf)
 {
 
     /*
      * Check the config arguments
      */
-    uint8_t status       = pkt->data[0];  // START/STOP
-    uint8_t pw_conf      = pkt->data[1];  // P, V, C and power source
-    uint8_t pw_meas_rate = pkt->data[2];  // Period/average
+    uint8_t status       = data[0];  // START/STOP
+    uint8_t pw_conf      = data[1];  // P, V, C and power source
+    uint8_t pw_meas_rate = data[2];  // Period/average
     int invalid_config = 0;
 
 
@@ -158,15 +159,17 @@ static int parse_consumption_config(packet_t *pkt,
 
 
 
-static int32_t config_consumption_measures(uint8_t cmd_type, packet_t *pkt)
+static int32_t config_consumption_measures(uint8_t cmd_type,
+        iotlab_packet_t *packet)
 {
     static struct consumption_config conf;
+    packet_t *pkt = (packet_t *)packet;
 
     if (3 != pkt->length)
         return 1;
 
     /* parse pkt arguments into conf */
-    if (parse_consumption_config(pkt, &conf))
+    if (parse_consumption_config(pkt->data, &conf))
         return 1;
 
     /*
@@ -201,12 +204,12 @@ static void do_config_consumption_measures(handler_arg_t arg)
     flush_current_consumption_measures();
 
     /* Send the update frame */
-    if (iotlab_serial_send_frame(ACK_FRAME, (iotlab_packet_t *)conf->pkt)) {
+    if (iotlab_serial_send_frame(ACK_FRAME, conf->pkt)) {
         // ERF that's really bad, config failed
         // send ERROR NOW TODO
         leds_on(RED_LED);
         cn_logger(LOGGER_ERROR, "Invalid ack pkt for consumption");
-        iotlab_packet_call_free((iotlab_packet_t *)conf->pkt);
+        iotlab_packet_call_free(conf->pkt);
         return;
     }
     /* Gateway will now be able to receive new packets */
@@ -228,7 +231,7 @@ static void consumption_measure_handler(handler_arg_t arg,
         float v, float c, float p, uint32_t measure_time_ticks)
 {
     struct soft_timer_timeval timestamp;
-    packet_t *pkt;
+    iotlab_packet_t *packet;
 
     iotlab_time_extend_relative(&timestamp, measure_time_ticks);
 
@@ -236,44 +239,43 @@ static void consumption_measure_handler(handler_arg_t arg,
         /*
          * alloc and init a new packet
          */
-        pkt = _iotlab_serial_packet_alloc();
-        if (NULL == pkt)
+        packet = _iotlab_serial_packet_alloc();
+        if (NULL == packet)
             return;  // alloc failed, drop this measure
 
         /*
          * init new measure packet
          */
-        cur_config.pkt = pkt;
-        pkt->data[0] = 0;  // empty packet
-        pkt->length  = 1;  // measures number byte
+        cur_config.pkt = packet;
+        ((packet_t *)packet)->data[0] = 0;  // empty packet
+        ((packet_t *)packet)->length  = 1;  // measures number byte
 
         /*
          * Save time reference and write it in packet
          */
         cur_config.t_ref_s = timestamp.tv_sec;  // time reference
-        iotlab_serial_append_data(pkt, &cur_config.t_ref_s, sizeof(uint32_t));
+        iotlab_packet_append_data(packet, &cur_config.t_ref_s, sizeof(uint32_t));
     }
-    pkt = cur_config.pkt;
-
+    packet = cur_config.pkt;
 
     /*
      * add measure
      */
-    pkt->data[0]++;
+    ((packet_t *)packet)->data[0]++;
 
     /* store the number of µs since t_ref_s */
     uint32_t usecs;
     usecs = timestamp.tv_usec;
     usecs += (timestamp.tv_sec - cur_config.t_ref_s) * SEC;
-    iotlab_serial_append_data(pkt, &usecs, sizeof(uint32_t));
+    iotlab_packet_append_data(packet, &usecs, sizeof(uint32_t));
 
     /* Add power consumption values */
     if (cur_config.p)
-        iotlab_serial_append_data(pkt, &p, sizeof(float));
+        iotlab_packet_append_data(packet, &p, sizeof(float));
     if (cur_config.v)
-        iotlab_serial_append_data(pkt, &v, sizeof(float));
+        iotlab_packet_append_data(packet, &v, sizeof(float));
     if (cur_config.c)
-        iotlab_serial_append_data(pkt, &c, sizeof(float));
+        iotlab_packet_append_data(packet, &c, sizeof(float));
 
 
     /*
@@ -282,7 +284,7 @@ static void consumption_measure_handler(handler_arg_t arg,
     int send_packet = 0;
 
     // Packet full
-    if ((pkt->length + cur_config.measure_size) > IOTLAB_SERIAL_DATA_MAX_SIZE)
+    if (iotlab_serial_packet_free_space(packet) < cur_config.measure_size)
         send_packet = 1;
 
     // No packet has been sent for a long time: around one or two seconds
@@ -297,26 +299,26 @@ static void consumption_measure_handler(handler_arg_t arg,
 /* Utils functions */
 
 
-static packet_t *alloc_pw_ack_frame(uint8_t pw_config)
+static iotlab_packet_t *alloc_pw_ack_frame(uint8_t pw_config)
 {
-    packet_t *pkt = _iotlab_serial_packet_alloc();
+    iotlab_packet_t *packet = _iotlab_serial_packet_alloc();
 
-    if (pkt) {
-        pkt->data[0] = CONFIG_CONSUMPTION;
-        pkt->data[1] = pw_config;
-        pkt->length = 2;
+    if (packet) {
+        ((packet_t *)packet)->data[0] = CONFIG_CONSUMPTION;
+        ((packet_t *)packet)->data[1] = pw_config;
+        ((packet_t *)packet)->length = 2;
     }
-    return pkt;
+    return packet;
 }
 
 void flush_current_consumption_measures()
 {
-    packet_t *pkt = cur_config.pkt;
+    iotlab_packet_t *packet = cur_config.pkt;
 
-    if (NULL == pkt)
+    if (NULL == packet)
         return;
-    if (iotlab_serial_send_frame(CONSUMPTION_FRAME, (iotlab_packet_t *)pkt))
-        iotlab_packet_call_free((iotlab_packet_t *)pkt);  // send fail
+    if (iotlab_serial_send_frame(CONSUMPTION_FRAME, packet))
+        iotlab_packet_call_free(packet); // send fail
 
     cur_config.pkt = NULL;
 }

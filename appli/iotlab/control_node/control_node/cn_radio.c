@@ -19,13 +19,13 @@
 #include "iotlab_leds.h"
 
 
-static int32_t radio_off(uint8_t cmd_type, packet_t *pkt);
-static int32_t radio_polling(uint8_t cmd_type, packet_t *pkt);
+static int32_t radio_off(uint8_t cmd_type, iotlab_packet_t *pkt);
+static int32_t radio_polling(uint8_t cmd_type, iotlab_packet_t *pkt);
 
-static int32_t radio_sniffer(uint8_t cmd_type, packet_t *pkt);
+static int32_t radio_sniffer(uint8_t cmd_type, iotlab_packet_t *pkt);
 #if 0
-static int32_t radio_injection(uint8_t cmd_type, packet_t *pkt);
-static int32_t radio_jamming(uint8_t cmd_type, packet_t *pkt);
+static int32_t radio_injection(uint8_t cmd_type, iotlab_packet_t *pkt);
+static int32_t radio_jamming(uint8_t cmd_type, iotlab_packet_t *pkt);
 #endif
 static void proper_stop();
 static int manage_channel_switch();
@@ -49,7 +49,7 @@ static struct
 
     /* Radio RX commands */
     struct {
-        packet_t *serial_pkt;
+        iotlab_packet_t *serial_pkt;
         uint32_t t_ref_s;
     } rssi;
     struct {
@@ -85,19 +85,19 @@ void cn_radio_start()
     // Set the handlers
     static iotlab_serial_handler_t handler_off = {
         .cmd_type = CONFIG_RADIO_STOP,
-        .handler = (iotlab_serial_handler)radio_off,
+        .handler = radio_off,
     };
     iotlab_serial_register_handler(&handler_off);
 
     static iotlab_serial_handler_t handler_polling = {
         .cmd_type = CONFIG_RADIO_MEAS,
-        .handler = (iotlab_serial_handler)radio_polling,
+        .handler = radio_polling,
     };
     iotlab_serial_register_handler(&handler_polling);
 
     static iotlab_serial_handler_t handler_sniffer = {
         .cmd_type = CONFIG_RADIO_SNIFFER,
-        .handler = (iotlab_serial_handler)radio_sniffer,
+        .handler = radio_sniffer,
     };
     iotlab_serial_register_handler(&handler_sniffer);
 
@@ -118,12 +118,12 @@ void cn_radio_start()
 
 void flush_current_rssi_measures()
 {
-    packet_t *pkt = radio.rssi.serial_pkt;
+    iotlab_packet_t *packet = radio.rssi.serial_pkt;
 
-    if (NULL == pkt)
+    if (NULL == packet)
         return;
-    if (iotlab_serial_send_frame(RADIO_MEAS_FRAME, (iotlab_packet_t *)pkt))
-        iotlab_packet_call_free((iotlab_packet_t *)pkt);  // send fail
+    if (iotlab_serial_send_frame(RADIO_MEAS_FRAME, packet))
+        iotlab_packet_call_free(packet);  // send fail
 
     radio.rssi.serial_pkt = NULL;
 }
@@ -176,8 +176,9 @@ static void set_next_channel()
 }
 
 /* ********************** OFF **************************** */
-static int32_t radio_off(uint8_t cmd_type, packet_t *pkt)
+static int32_t radio_off(uint8_t cmd_type, iotlab_packet_t *packet)
 {
+    (void)packet;
     // Stop all
     proper_stop();
     return 0;
@@ -187,7 +188,7 @@ static int32_t radio_off(uint8_t cmd_type, packet_t *pkt)
 /* ********************** POLLING **************************** */
 static void poll_time(handler_arg_t arg);
 
-static int32_t radio_polling(uint8_t cmd_type, packet_t *pkt)
+static int32_t radio_polling(uint8_t cmd_type, iotlab_packet_t *packet)
 {
     /*
      * Expected packet format is (length:7B):
@@ -196,6 +197,7 @@ static int32_t radio_polling(uint8_t cmd_type, packet_t *pkt)
      *      * Measures per channel      [1B]
      */
 
+    packet_t *pkt = (packet_t *)packet;
     if (pkt->length != 7)
         return 1;
 
@@ -243,50 +245,50 @@ static void poll_time(handler_arg_t arg)
 {
     int32_t ed = 0;
     struct soft_timer_timeval timestamp;
-    packet_t *pkt;
+    iotlab_packet_t *packet;
 
     phy_ed(platform_phy, &ed);
     iotlab_time_extend_relative(&timestamp, soft_timer_time());
 
     if (NULL == radio.rssi.serial_pkt) {
         /* alloc and init new packet */
-        pkt = _iotlab_serial_packet_alloc();
-        if (NULL == pkt)
+        packet = _iotlab_serial_packet_alloc();
+        if (NULL == packet)
             return;  // FAIL: drop measure
 
         /* Init new packet */
-        radio.rssi.serial_pkt = pkt;
-        pkt->data[0] = 0;
-        pkt->length  = 1;
+        radio.rssi.serial_pkt = packet;
+        ((packet_t *)packet)->data[0] = 0;
+        ((packet_t *)packet)->length  = 1;
 
         /* Save time reference and write it in packet */
         radio.rssi.t_ref_s = timestamp.tv_sec;
-        iotlab_serial_append_data(pkt, &timestamp.tv_sec, sizeof(uint32_t));
+        iotlab_packet_append_data(packet, &timestamp.tv_sec, sizeof(uint32_t));
     }
-    pkt = radio.rssi.serial_pkt;
+    packet = radio.rssi.serial_pkt;
 
 
     /*
      * Add measure
      */
-    pkt->data[0]++;
+    ((packet_t *)packet)->data[0]++;
 
     // store the number of µs since t_ref_s
     uint32_t usecs;
     usecs = timestamp.tv_usec;
     usecs += (timestamp.tv_sec - radio.rssi.t_ref_s) * SEC;
-    iotlab_serial_append_data(pkt, &usecs, sizeof(uint32_t));
+    iotlab_packet_append_data(packet, &usecs, sizeof(uint32_t));
 
     // rssi measure
     uint8_t channel = (uint8_t) radio.current_channel;
-    iotlab_serial_append_data(pkt, &channel, sizeof(uint8_t));
-    iotlab_serial_append_data(pkt, &ed, sizeof(uint8_t));
+    iotlab_packet_append_data(packet, &channel, sizeof(uint8_t));
+    iotlab_packet_append_data(packet, &ed, sizeof(uint8_t));
 
 
     /* Send packet if full or too old */
     int send_packet = 0;
     // packet full
-    if ((pkt->length + RSSI_MEASURE_SIZE) > IOTLAB_SERIAL_DATA_MAX_SIZE)
+    if (iotlab_serial_packet_free_space(packet) < RSSI_MEASURE_SIZE)
         send_packet = 1;
     // no pkt sent for more than a second or two
     if (usecs > (2 * SEC))
@@ -312,13 +314,14 @@ static void sniff_handle_rx_appli_queue(handler_arg_t arg);
 static void sniff_switch_channel(handler_arg_t arg);
 #endif
 
-static int32_t radio_sniffer(uint8_t cmd_type, packet_t *pkt)
+static int32_t radio_sniffer(uint8_t cmd_type, iotlab_packet_t *packet)
 {
     /*
      * Expected packet format is (length:6B):
      *      * channels                  [4B]
      *      * time per channel (ms)     [2B]
      */
+    packet_t *pkt = (packet_t *)packet;
 
     if (pkt->length != 6)
         return 1;
@@ -378,6 +381,18 @@ static void sniff_handle_rx(phy_status_t status)
             (handler_arg_t)status);
 }
 
+static void zep_to_packet(packet_t *pkt, phy_packet_t *rx_pkt, uint8_t channel)
+{
+    // TODO register time handler for phy_rx to do this in phy layer
+    struct soft_timer_timeval timestamp;
+    iotlab_time_extend_relative(&timestamp, rx_pkt->timestamp);
+    rx_pkt->timestamp_alt.msb = timestamp.tv_sec;
+    rx_pkt->timestamp_alt.lsb = timestamp.tv_usec;
+
+    // Save packet as zep
+    pkt->length = to_zep(pkt->data, rx_pkt, channel, cn_control_node_id());
+}
+
 static void sniff_handle_rx_appli_queue(handler_arg_t arg)
 {
     phy_status_t status = (phy_status_t)arg;
@@ -390,24 +405,14 @@ static void sniff_handle_rx_appli_queue(handler_arg_t arg)
     if (status != PHY_SUCCESS)
         return;
 
-    packet_t *serial_pkt = _iotlab_serial_packet_alloc();
-    if (serial_pkt == NULL)
+    iotlab_packet_t *packet = _iotlab_serial_packet_alloc();
+    if (packet == NULL)
         return;
 
+    zep_to_packet((packet_t *)packet, rx_pkt, radio.current_channel);
 
-    // TODO register time handler for phy_rx to do this in phy layer
-    struct soft_timer_timeval timestamp;
-    iotlab_time_extend_relative(&timestamp, rx_pkt->timestamp);
-    rx_pkt->timestamp_alt.msb = timestamp.tv_sec;
-
-    rx_pkt->timestamp_alt.lsb = timestamp.tv_usec;
-
-    // Save packet as zep
-    serial_pkt->length = to_zep(serial_pkt->data, rx_pkt,
-            radio.current_channel, cn_control_node_id());
-
-    if (iotlab_serial_send_frame(RADIO_SNIFFER_FRAME, (iotlab_packet_t *)serial_pkt))
-        iotlab_packet_call_free((iotlab_packet_t *)serial_pkt);
+    if (iotlab_serial_send_frame(RADIO_SNIFFER_FRAME, packet))
+        iotlab_packet_call_free(packet);
 }
 
 
@@ -425,7 +430,7 @@ static void sniff_switch_channel(handler_arg_t arg)
 static void injection_time(handler_arg_t arg);
 static void injection_tx_done(phy_status_t status);
 
-static int32_t radio_injection(uint8_t cmd_type, packet_t *pkt)
+static int32_t radio_injection(uint8_t cmd_type, iotlab_packet_t *pkt)
 {
     // Stop all
     proper_stop();
@@ -556,7 +561,7 @@ static void injection_tx_done(phy_status_t status)
 
 /* ********************** JAMMING **************************** */
 static void jam_change_channel_time(handler_arg_t arg);
-static int32_t radio_jamming(uint8_t cmd_type, packet_t *pkt)
+static int32_t radio_jamming(uint8_t cmd_type, iotlab_packet_t *pkt)
 {
     // Stop all
     proper_stop();

@@ -24,14 +24,14 @@ static struct {
 
 
 
-static int32_t set_time(uint8_t cmd_type, packet_t *pkt);
+static int32_t set_time(uint8_t cmd_type, iotlab_packet_t *pkt);
 static void do_set_time(handler_arg_t arg);
 
-static int32_t set_node_id(uint8_t cmd_type, packet_t *pkt);
+static int32_t set_node_id(uint8_t cmd_type, iotlab_packet_t *pkt);
 
 static soft_timer_t green_led_alarm;
-static int32_t green_led_blink(uint8_t cmd_type, packet_t *pkt);
-static int32_t green_led_on(uint8_t cmd_type, packet_t *pkt);
+static int32_t green_led_blink(uint8_t cmd_type, iotlab_packet_t *pkt);
+static int32_t green_led_on(uint8_t cmd_type, iotlab_packet_t *pkt);
 
 
 void cn_control_start()
@@ -40,14 +40,14 @@ void cn_control_start()
     // set_time
     static iotlab_serial_handler_t handler_set_time = {
         .cmd_type = SET_TIME,
-        .handler = (iotlab_serial_handler)set_time,
+        .handler = set_time,
     };
     iotlab_serial_register_handler(&handler_set_time);
 
     // set_node_id
     static iotlab_serial_handler_t handler_set_node_id = {
         .cmd_type = SET_NODE_ID,
-        .handler = (iotlab_serial_handler)set_node_id,
+        .handler = set_node_id,
     };
     iotlab_serial_register_handler(&handler_set_node_id);
 
@@ -55,12 +55,12 @@ void cn_control_start()
     // green led control
     static iotlab_serial_handler_t handler_green_led_blink = {
         .cmd_type = GREEN_LED_BLINK,
-        .handler = (iotlab_serial_handler)green_led_blink,
+        .handler = green_led_blink,
     };
     iotlab_serial_register_handler(&handler_green_led_blink);
     static iotlab_serial_handler_t handler_green_led_on = {
         .cmd_type = GREEN_LED_ON,
-        .handler = (iotlab_serial_handler)green_led_on,
+        .handler = green_led_on,
     };
     iotlab_serial_register_handler(&handler_green_led_on);
 }
@@ -71,21 +71,23 @@ static struct {
 } set_time_aux;
 
 
-static int32_t set_time(uint8_t cmd_type, packet_t *pkt)
+static int32_t set_time(uint8_t cmd_type, iotlab_packet_t *packet)
 {
+    packet_t *pkt = (packet_t *)packet;
     if (8 != pkt->length)
         return 1;
     /* Save time as soon as possible */
+    // TODO: Use time in packet later
     set_time_aux.t0 = soft_timer_time_extended();
     /* copy unix time from pkt */
     memcpy(&set_time_aux.unix_time, pkt->data, pkt->length);
 
     /* alloc the ack frame */
-    packet_t *ack_pkt = _iotlab_serial_packet_alloc();
+    iotlab_packet_t *ack_pkt = _iotlab_serial_packet_alloc();
     if (!ack_pkt)
         return 1;
-    ack_pkt->data[0] = SET_TIME;
-    ack_pkt->length = 1;
+    ((packet_t *)ack_pkt)->data[0] = SET_TIME;
+    ((packet_t *)ack_pkt)->length = 1;
 
     if (event_post(EVENT_QUEUE_APPLI, do_set_time, ack_pkt))
         return 1;
@@ -95,7 +97,7 @@ static int32_t set_time(uint8_t cmd_type, packet_t *pkt)
 
 static void do_set_time(handler_arg_t arg)
 {
-    packet_t *ack_pkt = (packet_t *)arg;
+    iotlab_packet_t *ack_pkt = (iotlab_packet_t *)arg;
 
     /*
      * Flush measures packets
@@ -106,8 +108,8 @@ static void do_set_time(handler_arg_t arg)
     flush_current_rssi_measures();
 
     // Send the update frame
-    if (iotlab_serial_send_frame(ACK_FRAME, (iotlab_packet_t *)ack_pkt)) {
-        iotlab_packet_call_free((iotlab_packet_t *)ack_pkt);
+    if (iotlab_serial_send_frame(ACK_FRAME, ack_pkt)) {
+        iotlab_packet_call_free(ack_pkt);
         return;
     }
 
@@ -120,8 +122,9 @@ uint16_t cn_control_node_id()
     return cn_control.node_id;
 }
 
-static int32_t set_node_id(uint8_t cmd_type, packet_t *pkt)
+static int32_t set_node_id(uint8_t cmd_type, iotlab_packet_t *packet)
 {
+    packet_t *pkt = (packet_t *)packet;
     if (2 != pkt->length)
         return 1;
 
@@ -134,14 +137,16 @@ static int32_t set_node_id(uint8_t cmd_type, packet_t *pkt)
  * green led control
  */
 
-int32_t green_led_blink(uint8_t cmd_type, packet_t *pkt)
+int32_t green_led_blink(uint8_t cmd_type, iotlab_packet_t *packet)
 {
+    (void)packet;
     leds_blink(&green_led_alarm, soft_timer_s_to_ticks(1), GREEN_LED);
     return 0;
 }
 
-int32_t green_led_on(uint8_t cmd_type, packet_t *pkt)
+int32_t green_led_on(uint8_t cmd_type, iotlab_packet_t *packet)
 {
+    (void)packet;
     leds_blink(&green_led_alarm, 0, GREEN_LED); // stop
     leds_on(GREEN_LED);
 

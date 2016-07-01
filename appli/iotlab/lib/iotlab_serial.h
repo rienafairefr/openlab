@@ -71,7 +71,7 @@ typedef struct {
 
 iotlab_packet_t *iotlab_serial_packet_alloc(iotlab_packet_queue_t *queue);
 // Transitional functions
-packet_t *_iotlab_serial_packet_alloc();
+iotlab_packet_t *_iotlab_serial_packet_alloc();
 void iotlab_serial_append_data(packet_t *pkt, void *data, size_t size);
 
 /**
