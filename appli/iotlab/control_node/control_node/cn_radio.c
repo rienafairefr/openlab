@@ -339,18 +339,13 @@ static int32_t radio_sniffer(uint8_t cmd_type, packet_t *pkt)
     if (radio.channels == 0)
         return 1;
 
-    /* Must switch with multiple channels */
-    if (radio.channels & (radio.channels -1)) {
-        // Multiple channels
-        return 1; // TODO handle multiple channels
 
-        if (0 == time_per_channel)
-            return 1;
-    } else {
-        if (0 != time_per_channel)
-            return 1;
-    }
+    // Multiple channels given, error
+    if (radio.channels & (radio.channels -1))
+        return 1;
 
+    if (0 != time_per_channel)
+        return 1;
 
     /*
      * Now config radio
@@ -365,17 +360,6 @@ static int32_t radio_sniffer(uint8_t cmd_type, packet_t *pkt)
     radio.sniff.pkt_index = 0;
 
     sniff_rx();
-
-    // TODO, See how to do this correctly with multiple channels
-    // problems with the multiple queues
-    // iotlab_serial should be called from appli queue
-#if 0
-    // Start channel switch timer
-    if (time_per_channel != 0) {
-        soft_timer_set_handler(&radio.timer, sniff_switch_channel, NULL);
-        soft_timer_start(&radio.timer, soft_timer_ms_to_ticks(time_per_channel), 1);
-    }
-#endif
 
     // OK
     return 0;
