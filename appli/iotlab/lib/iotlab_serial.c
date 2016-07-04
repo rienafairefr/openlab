@@ -197,7 +197,8 @@ int32_t iotlab_serial_send_frame(uint8_t type, iotlab_packet_t *pkt)
 
     iotlab_packet_fifo_prio_append(&ser.tx.fifo, pkt);
 
-    send_now(NULL);
+    if (event_post(EVENT_QUEUE_APPLI, send_now, NULL))
+        ser.tx.irq_triggered = 1;  // error, idle hook will trigger it later
     return 0;
 }
 
@@ -366,15 +367,15 @@ static void handle_packet_sent(handler_arg_t arg)
     if (ser.tx.pkt == NULL) {
         leds_on(RED_LED);
         log_error("Packet sent but no packet!");
-        return;
+    } else {
+        // Free the packet
+        iotlab_packet_call_free(ser.tx.pkt);
+
+        // Clear the TX busy flag
+        ser.tx.pkt = NULL;
+        ser.tx.irq_triggered = 0;
     }
 
-    // Free the packet
-    iotlab_packet_call_free(ser.tx.pkt);
-
-    // Clear the TX busy flag
-    ser.tx.pkt = NULL;
-    ser.tx.irq_triggered = 0;
-
+    // Just try sending anyway
     send_now(NULL);
 }
