@@ -24,6 +24,11 @@
  *      Author: burindes
  */
 #include "platform.h"
+
+#include "nvic_.h"
+#include "exti.h"
+#include "cm3_nvic_registers.h"
+
 #include "iotlab_leds.h"
 #include "iotlab_serial.h"
 
@@ -39,9 +44,13 @@ enum
 };
 
 /** Handler for IDLE check */
-static int32_t check_uart(handler_arg_t arg);
+static int32_t idle_hook_uart(handler_arg_t arg);
 /** Handler for character received */
 static void char_rx(handler_arg_t arg, uint8_t c);
+/** Handler for second interrupt */
+static void check_uart(handler_arg_t arg);
+static void uart_low_priority_interrupt_init(handler_t handler);
+static void uart_low_priority_interrupt_trigger();
 
 static void allocate_rx_packet(handler_arg_t arg);
 static void packet_received(handler_arg_t arg);
@@ -54,6 +63,15 @@ static void tx_done_isr(handler_arg_t arg);
 
 // Two should be enough for commands,
 #define IOTLAB_SERIAL_NUM_RX_PKTS (2)
+
+
+/*
+ * Uart low priority interruption
+ * Using an EXTI_LINE to simulate software interrupt
+ */
+
+#define  NVIC_IOTLAB_SERIAL_IRQ_LINE  NVIC_IRQ_LINE_EXTI2
+#define  NVIC_IOTLAB_SERIAL_EXTI_LINE EXTI_LINE_Px2
 
 
 /** */
@@ -96,6 +114,8 @@ void iotlab_serial_start(uint32_t baudrate)
     if (uart_external == NULL)
         uart_external = uart_print;
 
+    uart_low_priority_interrupt_init(check_uart);
+
     uart_enable(uart_external, baudrate);
     iotlab_packet_init_queue(&ser.rx.queue,
             ser.rx.packets, IOTLAB_SERIAL_NUM_RX_PKTS);
@@ -118,7 +138,7 @@ void iotlab_serial_start(uint32_t baudrate)
     // But be careful, the interrupt handler CANNOT use FreeRTOS or event functions
     // Therefore we use the platform IDLE handler to check for input
     uart_set_irq_priority(uart_external, 0x10);
-    platform_set_idle_handler(check_uart, NULL);
+    platform_set_idle_handler(idle_hook_uart, NULL);
 
     // allocate first packet
     allocate_rx_packet(NULL);
@@ -283,42 +303,16 @@ static void char_rx(handler_arg_t arg, uint8_t c)
         // Switch buffers
         ser.rx.ready_pkt = ser.rx.rx_pkt;
         ser.rx.rx_pkt = NULL;
+
+        uart_low_priority_interrupt_trigger();
     }
 }
 
-static int32_t check_uart(handler_arg_t arg)
-{
-    int32_t ret = 0;
-
-    if (ser.rx.ready_pkt) {
-        event_post(EVENT_QUEUE_APPLI, packet_received, NULL);
-        ret = 1;
-    }
-
-    if (ser.rx.rx_pkt == NULL) {
-        event_post(EVENT_QUEUE_APPLI, allocate_rx_packet, NULL);
-        ret = 1;
-    }
-
-    if (ser.tx.irq_triggered) {
-        event_post(EVENT_QUEUE_APPLI, handle_packet_sent, NULL);
-        ret = 1;
-    }
-
-    return ret;
-}
-
-static void allocate_rx_packet(handler_arg_t arg)
-{
-    // Allocate a new packet for RX
-    if (ser.rx.rx_pkt == NULL)
-        ser.rx.rx_pkt = iotlab_serial_packet_alloc(&ser.rx.queue);
-}
 
 static void packet_received(handler_arg_t arg)
 {
-    // Allocate a new packet for RX
-    allocate_rx_packet(NULL);
+    if (ser.rx.ready_pkt == NULL)
+        return;
 
     // Get the ready packet and prepare for next RX
     iotlab_packet_t *rx_pkt = ser.rx.ready_pkt;
@@ -356,9 +350,29 @@ static void send_packet(iotlab_packet_t *packet)
             tx_done_isr, NULL);
 }
 
+
+/* Interrupts and idle_hook */
+
+/* normal priority to allow calling OS functions */
+static void uart_low_priority_interrupt_init(handler_t handler)
+{
+    nvic_enable_interrupt_line(NVIC_IOTLAB_SERIAL_IRQ_LINE);
+    nvic_set_priority(NVIC_IOTLAB_SERIAL_IRQ_LINE, 0xFE);
+    exti_set_handler(NVIC_IOTLAB_SERIAL_EXTI_LINE, handler, NULL);
+}
+
+static void uart_low_priority_interrupt_trigger()
+{
+    *cm3_nvic_get_STIR() = NVIC_IOTLAB_SERIAL_IRQ_LINE;
+}
+
+
+/* High priority, no OS functions allowed */
+
 static void tx_done_isr(handler_arg_t arg)
 {
     ser.tx.irq_triggered = 1;
+    uart_low_priority_interrupt_trigger();
 }
 
 static void handle_packet_sent(handler_arg_t arg)
@@ -378,4 +392,36 @@ static void handle_packet_sent(handler_arg_t arg)
 
     // Just try sending anyway
     send_now(NULL);
+}
+
+static void allocate_rx_packet(handler_arg_t arg)
+{
+    // Allocate a new packet for RX
+    if (ser.rx.rx_pkt == NULL)
+        ser.rx.rx_pkt = iotlab_serial_packet_alloc(&ser.rx.queue);
+}
+
+static void check_uart(handler_arg_t arg)
+{
+    allocate_rx_packet(NULL);
+
+    if (ser.rx.ready_pkt) {
+        event_post_from_isr(EVENT_QUEUE_APPLI, packet_received, NULL);
+    }
+
+    if (ser.tx.irq_triggered) {
+        event_post_from_isr(EVENT_QUEUE_APPLI, handle_packet_sent, NULL);
+    }
+}
+
+// Idle hook may find cases where 'check_uart' failed to post from isr
+static int32_t idle_hook_uart(handler_arg_t arg)
+{
+    (void)arg;
+
+    if (ser.rx.ready_pkt || ser.tx.irq_triggered) {
+        uart_low_priority_interrupt_trigger();
+        return 1;
+    }
+    return 0;
 }
