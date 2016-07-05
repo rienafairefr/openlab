@@ -7,12 +7,15 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/appli/iotlab/periph
     ${PROJECT_SOURCE_DIR}/appli/iotlab/autotest_common
     ${PROJECT_SOURCE_DIR}/appli/iotlab/lib
+
+    ${PROJECT_SOURCE_DIR}/lib/event
     )
 
 if(${PLATFORM_HAS_INA226})
     add_executable(control_node
         main
         cn_meas_pkt
+        cn_priority
         cn_alim
         cn_control
         cn_consumption
@@ -38,6 +41,7 @@ if (PLATFORM STREQUAL "iotlab-m3")
     add_executable(control_node_m3
         main
         cn_meas_pkt
+        cn_priority
         cn_control
         cn_radio
         cn_logger
