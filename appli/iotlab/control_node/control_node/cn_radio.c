@@ -22,8 +22,8 @@
 
 static int32_t radio_off(uint8_t cmd_type, iotlab_packet_t *pkt);
 static int32_t radio_polling(uint8_t cmd_type, iotlab_packet_t *pkt);
-
 static int32_t radio_sniffer(uint8_t cmd_type, iotlab_packet_t *pkt);
+
 #if 0
 static int32_t radio_injection(uint8_t cmd_type, iotlab_packet_t *pkt);
 static int32_t radio_jamming(uint8_t cmd_type, iotlab_packet_t *pkt);
@@ -31,6 +31,10 @@ static int32_t radio_jamming(uint8_t cmd_type, iotlab_packet_t *pkt);
 static void proper_stop();
 static int manage_channel_switch();
 static void set_next_channel();
+static void schedule_polling_timer();
+
+static void poll_time(handler_arg_t arg);
+static void sniff_rx(void);
 
 enum {
     RSSI_MEASURE_SIZE = sizeof(uint8_t) + sizeof(uint32_t),
@@ -46,22 +50,26 @@ typedef enum radio_mode {
     RADIO_SNIFFER,
 } radio_mode_t;
 
+struct radio_config {
+    radio_mode_t mode;
+    uint32_t channels;
+    uint32_t num_operations_per_channel;
+    uint32_t measure_period;
+};
+
+static void update_config(struct radio_config *config);
+
 static struct
 {
-    radio_mode_t mode;
+    struct radio_config config;
 
     soft_timer_t timer;
 
-    uint32_t channels;
     uint32_t current_channel;
+    uint8_t  current_op_num_on_channel;
 
     iotlab_packet_t meas_pkts[CN_RADIO_NUM_PKTS];
     iotlab_packet_queue_t measures_queue;
-
-    uint32_t num_operations_per_channel;
-    uint8_t  current_op_num_on_channel;
-
-    uint32_t measure_period;
 
     /* Radio RX commands */
     struct {
@@ -71,8 +79,8 @@ static struct
         phy_packet_t pkt_buf[2];
         int pkt_index;
     } sniff;
-#if 0
 
+#if 0
     /* Radio TX commands */
     struct {
         phy_power_t tx_power;
@@ -84,22 +92,30 @@ static struct
         phy_power_t tx_power;
     } jam;
 #endif
-} radio = {
+} radio;
+
+
+static struct radio_config default_config = {
     .mode = RADIO_OFF,
-    .sniff = {
-        .pkt_index = 0,
-        .pkt_buf = {
-            // static version of phy_preprare_packet
-            [0] = { .data = radio.sniff.pkt_buf[0].raw_data },
-            [1] = { .data = radio.sniff.pkt_buf[1].raw_data },
-        }
-    }
+    .channels = 0,
+    .num_operations_per_channel = 0,
 };
 
-void cn_radio_start()
+static void radio_init()
 {
     iotlab_packet_init_queue(&radio.measures_queue,
             radio.meas_pkts, CN_RADIO_NUM_PKTS);
+
+    radio.rssi.serial_pkt = NULL;
+    radio.sniff.pkt_index = 0;
+    phy_prepare_packet(&radio.sniff.pkt_buf[0]);
+    phy_prepare_packet(&radio.sniff.pkt_buf[1]);
+}
+
+void cn_radio_start()
+{
+    radio_init();
+    update_config(&default_config);
 
     // Set the handlers
     static iotlab_serial_handler_t handler_off = {
@@ -145,9 +161,45 @@ void cn_radio_start()
  */
 static void schedule_polling_timer()
 {
-    soft_timer_start(&radio.timer, radio.measure_period, 0);
+    soft_timer_start(&radio.timer, radio.config.measure_period, 0);
 }
 
+static void _set_new_config(struct radio_config *config);
+static void update_config(struct radio_config *config)
+{
+    // Set back default config
+    memcpy(&radio.config, &default_config, sizeof(struct radio_config));
+    proper_stop();
+
+    // update in another event in case an event occured between
+    if (event_post(EVENT_QUEUE_APPLI, (handler_t)_set_new_config, config))
+        return;  // Could not update configuration // TODO
+}
+
+static void _set_new_config(struct radio_config *config)
+{
+    memcpy(&radio.config, config, sizeof(struct radio_config));
+
+    switch (config->mode) {
+    case RADIO_OFF:
+        break;  // already off
+    case RADIO_POLLING:
+        // Select first radio channel
+        set_next_channel();
+        // Start Timer
+        soft_timer_set_handler(&radio.timer, poll_time, NULL);
+        schedule_polling_timer();
+        break;
+    case RADIO_SNIFFER:
+        // Select first radio channel
+        set_next_channel();
+        // Select first packet
+        radio.sniff.pkt_index = 0;
+
+        sniff_rx();
+        break;
+    }
+}
 
 void flush_current_rssi_measures()
 {
@@ -162,8 +214,6 @@ static void proper_stop()
     // Set PHY idle
     phy_idle(platform_phy);
 
-    // TODO RADIO ACK ???
-
     /* Reset configs */
     radio.current_channel = 0;
     radio.current_op_num_on_channel = 0;
@@ -173,14 +223,14 @@ static void proper_stop()
 
 static int manage_channel_switch()
 {
-    if (0 == radio.num_operations_per_channel)
+    if (0 == radio.config.num_operations_per_channel)
         return 1;  // channel switch disabled
 
     // increment operation num
     radio.current_op_num_on_channel++;
 
     // test if channel switch required
-    if (radio.num_operations_per_channel == radio.current_op_num_on_channel) {
+    if (radio.config.num_operations_per_channel == radio.current_op_num_on_channel) {
         set_next_channel();
         radio.current_op_num_on_channel = 0;
         return 0;
@@ -197,7 +247,7 @@ static void set_next_channel()
         radio.current_channel++;
         if (radio.current_channel > PHY_2400_MAX_CHANNEL)
             radio.current_channel = PHY_2400_MIN_CHANNEL;
-    } while ((radio.channels & (1 << radio.current_channel)) == 0);
+    } while ((radio.config.channels & (1 << radio.current_channel)) == 0);
     phy_set_channel(platform_phy, radio.current_channel);
 }
 
@@ -205,15 +255,14 @@ static void set_next_channel()
 static int32_t radio_off(uint8_t cmd_type, iotlab_packet_t *packet)
 {
     (void)packet;
-    // Stop all
-    radio.mode = RADIO_OFF;
-    proper_stop();
+    // Stop from radio event queue
+    if (event_post(EVENT_QUEUE_APPLI, (handler_t)update_config, &default_config))
+        return 1;  // Could not update configuration
     return 0;
 }
 
 
 /* ********************** POLLING **************************** */
-static void poll_time(handler_arg_t arg);
 
 static int32_t radio_polling(uint8_t cmd_type, iotlab_packet_t *packet)
 {
@@ -223,52 +272,44 @@ static int32_t radio_polling(uint8_t cmd_type, iotlab_packet_t *packet)
      *      * Measure period (ms)       [2B]
      *      * Measures per channel      [1B]
      */
+    static struct radio_config config = {
+        .mode = RADIO_POLLING,
+    };
 
     packet_t *pkt = (packet_t *)packet;
     if (pkt->length != 7)
         return 1;
 
     size_t index = 0;
-    uint16_t measure_period;
 
     /** GET values, system endian */
-    memcpy(&radio.channels, &pkt->data[index], 4);
+    memcpy(&config.channels, &pkt->data[index], 4);
     index += 4;
-    memcpy(&measure_period, &pkt->data[index], sizeof(uint16_t));
+    memcpy(&config.measure_period, &pkt->data[index], sizeof(uint16_t));
     index += 2;
-    memcpy(&radio.num_operations_per_channel, &pkt->data[index], 1);
+    memcpy(&config.num_operations_per_channel, &pkt->data[index], 1);
     index ++;
 
     /*
      * Check arguments validity
      */
-    radio.channels &= PHY_MAP_CHANNEL_2400_ALL;
-    if (radio.channels == 0)
+    config.channels &= PHY_MAP_CHANNEL_2400_ALL;
+    if (config.channels == 0)
         return 1;
 
-    if (0 == measure_period)
+    if (0 == config.measure_period)
         return 1;
-    // radio.num_operations_per_channel:  0 means no switch
+    config.measure_period = soft_timer_ms_to_ticks(config.measure_period);
+    // config.num_operations_per_channel:  0 means no switch
 
 
-    /*
-     * Now config radio
-     */
-    radio.mode = RADIO_POLLING;
-    radio.measure_period = soft_timer_ms_to_ticks(measure_period);
-
-    // Stop previous and reset config
-    proper_stop();
-
-    // Select first radio channel
-    set_next_channel();
-
-    // Start Timer
-    soft_timer_set_handler(&radio.timer, poll_time, NULL);
-    schedule_polling_timer();
+    // Configure from radio event queue
+    if (event_post(EVENT_QUEUE_APPLI, (handler_t)update_config, &config))
+        return 1;  // Could not update configuration
 
     return 0;
 }
+
 
 static void poll_time(handler_arg_t arg)
 {
@@ -277,7 +318,7 @@ static void poll_time(handler_arg_t arg)
     iotlab_packet_t *packet;
     uint8_t channel = (uint8_t) radio.current_channel;
 
-    if (radio.mode != RADIO_POLLING)
+    if (radio.config.mode != RADIO_POLLING)
         return;
 
     schedule_polling_timer();
@@ -310,7 +351,6 @@ poll_time_end:
 
 /* ********************** SNIFFER **************************** */
 
-static void sniff_rx();
 static void sniff_handle_rx(phy_status_t status);
 static void sniff_handle_rx_appli_queue(handler_arg_t arg);
 #if 0
@@ -324,6 +364,10 @@ static int32_t radio_sniffer(uint8_t cmd_type, iotlab_packet_t *packet)
      *      * channels                  [4B]
      *      * time per channel (ms)     [2B]
      */
+    static struct radio_config config = {
+        .mode = RADIO_SNIFFER,
+    };
+
     packet_t *pkt = (packet_t *)packet;
 
     if (pkt->length != 6)
@@ -333,7 +377,7 @@ static int32_t radio_sniffer(uint8_t cmd_type, iotlab_packet_t *packet)
     uint16_t time_per_channel;
 
     /** GET values, system endian */
-    memcpy(&radio.channels, &pkt->data[index], 4);
+    memcpy(&config.channels, &pkt->data[index], 4);
     index += 4;
     memcpy(&time_per_channel, &pkt->data[index], sizeof(uint16_t));
     index += 2;
@@ -341,32 +385,20 @@ static int32_t radio_sniffer(uint8_t cmd_type, iotlab_packet_t *packet)
     /*
      * Check arguments validity
      */
-    radio.channels &= PHY_MAP_CHANNEL_2400_ALL;
-    if (radio.channels == 0)
+    config.channels &= PHY_MAP_CHANNEL_2400_ALL;
+    if (config.channels == 0)
         return 1;
 
-
     // Multiple channels given, error
-    if (radio.channels & (radio.channels -1))
+    if (config.channels & (config.channels -1))
         return 1;
 
     if (0 != time_per_channel)
         return 1;
 
-    /*
-     * Now config radio
-     */
-    radio.mode = RADIO_SNIFFER;
-
-    // Stop previous and reset config
-    proper_stop();
-    // Select first radio channel
-    set_next_channel();
-
-    // Select first packet
-    radio.sniff.pkt_index = 0;
-
-    sniff_rx();
+    // Configure from radio event queue
+    if (event_post(EVENT_QUEUE_APPLI, (handler_t)update_config, &config))
+        return 1; // Could not update configuration
 
     // OK
     return 0;
@@ -381,8 +413,7 @@ static void sniff_rx()
 
 static void sniff_handle_rx(phy_status_t status)
 {
-    event_post(EVENT_QUEUE_APPLI, sniff_handle_rx_appli_queue,
-            (handler_arg_t)status);
+    event_post(EVENT_QUEUE_APPLI, sniff_handle_rx_appli_queue, (handler_arg_t)status);
 }
 
 static void zep_to_packet(packet_t *pkt, phy_packet_t *rx_pkt, uint8_t channel)
@@ -399,7 +430,7 @@ static void zep_to_packet(packet_t *pkt, phy_packet_t *rx_pkt, uint8_t channel)
 
 static void sniff_handle_rx_appli_queue(handler_arg_t arg)
 {
-    if (radio.mode != RADIO_SNIFFER)
+    if (radio.config.mode != RADIO_SNIFFER)
         return;
 
     phy_status_t status = (phy_status_t)arg;
