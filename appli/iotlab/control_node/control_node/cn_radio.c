@@ -61,6 +61,8 @@ static struct
     uint32_t num_operations_per_channel;
     uint8_t  current_op_num_on_channel;
 
+    uint32_t measure_period;
+
     /* Radio RX commands */
     struct {
         iotlab_packet_t *serial_pkt;
@@ -132,6 +134,20 @@ void cn_radio_start()
     iotlab_serial_register_handler(&handler_jamming);
 #endif
 }
+
+/*
+ * Use a non-periodic timer, because for periodic timers, handlers are queued
+ * before soft_timer does the 'event_post'.
+ * We want only one a finite number of handler at the same time, so only
+ * ask to schedule next event when one is currently handled.
+ * This way there are only one waiting at the same time.
+ *
+ */
+static void schedule_polling_timer()
+{
+    soft_timer_start(&radio.timer, radio.measure_period, 0);
+}
+
 
 void flush_current_rssi_measures()
 {
@@ -239,6 +255,7 @@ static int32_t radio_polling(uint8_t cmd_type, iotlab_packet_t *packet)
      * Now config radio
      */
     radio.mode = RADIO_POLLING;
+    radio.measure_period = soft_timer_ms_to_ticks(measure_period);
 
     // Stop previous and reset config
     proper_stop();
@@ -248,7 +265,7 @@ static int32_t radio_polling(uint8_t cmd_type, iotlab_packet_t *packet)
 
     // Start Timer
     soft_timer_set_handler(&radio.timer, poll_time, NULL);
-    soft_timer_start(&radio.timer, soft_timer_ms_to_ticks(measure_period), 1);
+    schedule_polling_timer();
 
     return 0;
 }
@@ -262,6 +279,8 @@ static void poll_time(handler_arg_t arg)
 
     if (radio.mode != RADIO_POLLING)
         return;
+
+    schedule_polling_timer();
 
     phy_ed(platform_phy, &ed);
     iotlab_time_extend_relative(&timestamp, soft_timer_time());
