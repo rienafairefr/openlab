@@ -23,6 +23,8 @@
  *  Created on: Aug 12, 2013
  *      Author: burindes
  */
+#include "FreeRTOS.h"
+#include "semphr.h"
 #include "platform.h"
 
 #include "nvic_.h"
@@ -53,9 +55,10 @@ static void uart_low_priority_interrupt_init(handler_t handler);
 static void uart_low_priority_interrupt_trigger();
 
 static void allocate_rx_packet(handler_arg_t arg);
+static void iotlab_serial_tx_task(void *param);
 static void packet_received(handler_arg_t arg);
-static void send_now(handler_arg_t arg);
 static void send_packet(iotlab_packet_t *packet);
+
 
 /** Function called at the end of a UART TX transfer */
 static void tx_done_isr(handler_arg_t arg);
@@ -75,9 +78,6 @@ static void tx_done_isr(handler_arg_t arg);
 #define  NVIC_IOTLAB_SERIAL_EXTI_LINE EXTI_LINE_Px2
 
 
-/** */
-static void handle_packet_sent(handler_arg_t arg);
-
 static struct {
     iotlab_serial_handler_t *first_handler;
 
@@ -91,6 +91,9 @@ static struct {
 
         /** Flag to indicate end of asynchronous TX */
         volatile uint32_t irq_triggered;
+
+        /** Semaphore to wait for tx end*/
+        xSemaphoreHandle tx_end_event;
     } tx;
 
     /** Structure holding RX information */
@@ -116,6 +119,7 @@ void iotlab_serial_start(uint32_t baudrate)
         uart_external = uart_print;
 
     uart_low_priority_interrupt_init(check_uart);
+    ser.tx.tx_end_event = xSemaphoreCreateCounting(1, 0);
 
     uart_enable(uart_external, baudrate);
     iotlab_packet_init_queue(&ser.rx.queue,
@@ -140,6 +144,10 @@ void iotlab_serial_start(uint32_t baudrate)
     // Therefore we use the platform IDLE handler to check for input
     uart_set_irq_priority(uart_external, 0x10);
     platform_set_idle_handler(idle_hook_uart, NULL);
+
+    xTaskCreate(iotlab_serial_tx_task, (signed char *)"serial_tx",
+            configMINIMAL_STACK_SIZE, NULL,
+            configMAX_PRIORITIES - 1, NULL);
 
     // allocate first packet
     allocate_rx_packet(NULL);
@@ -218,9 +226,6 @@ int32_t iotlab_serial_send_frame(uint8_t type, iotlab_packet_t *pkt)
         return ret;
 
     iotlab_packet_fifo_prio_append(&ser.tx.fifo, pkt);
-
-    if (event_post(EVENT_QUEUE_APPLI, send_now, NULL))
-        ser.tx.irq_triggered = 1;  // error, idle hook will trigger it later
     return 0;
 }
 
@@ -326,20 +331,16 @@ static void packet_received(handler_arg_t arg)
     iotlab_serial_send_result(rx_pkt, cmd_type, result);
 }
 
-/* Start sending packets if lib was idle */
-static void send_now(handler_arg_t arg)
+// Transmission
+
+static void iotlab_serial_tx_task(void *param)
 {
-    if (ser.tx.pkt)
-        return;  // Uart Send active, tx.fifo will be handled asyncronously
-
-    // Try to get a frame from the FIFO
-    if (iotlab_packet_fifo_count(&ser.tx.fifo) == 0)
-        return;  // nothing to send
-
-    // Only one reader so it's safe, it won't block
-    ser.tx.pkt = iotlab_packet_fifo_get(&ser.tx.fifo);
-
-    send_packet(ser.tx.pkt);
+    for (;;) {
+        iotlab_packet_t *packet;
+        packet = iotlab_packet_fifo_get(&ser.tx.fifo);  // Blocking
+        send_packet(packet);
+        iotlab_packet_call_free(packet);
+    }
 }
 
 static void send_packet(iotlab_packet_t *packet)
@@ -350,6 +351,8 @@ static void send_packet(iotlab_packet_t *packet)
 
     uart_transfer_async(uart_external, pkt->raw_data, pkt->length,
             tx_done_isr, NULL);
+    // Block until finished
+    xSemaphoreTake(ser.tx.tx_end_event, portMAX_DELAY);
 }
 
 
@@ -377,25 +380,6 @@ static void tx_done_isr(handler_arg_t arg)
     uart_low_priority_interrupt_trigger();
 }
 
-static void handle_packet_sent(handler_arg_t arg)
-{
-    // Check there is a packet being sent
-    if (ser.tx.pkt == NULL) {
-        leds_on(RED_LED);
-        log_error("Packet sent but no packet!");
-    } else {
-        // Free the packet
-        iotlab_packet_call_free(ser.tx.pkt);
-
-        // Clear the TX busy flag
-        ser.tx.pkt = NULL;
-        ser.tx.irq_triggered = 0;
-    }
-
-    // Just try sending anyway
-    send_now(NULL);
-}
-
 static void allocate_rx_packet(handler_arg_t arg)
 {
     // Allocate a new packet for RX
@@ -405,6 +389,7 @@ static void allocate_rx_packet(handler_arg_t arg)
 
 static void check_uart(handler_arg_t arg)
 {
+    portBASE_TYPE yield;
     allocate_rx_packet(NULL);
 
     if (ser.rx.ready_pkt) {
@@ -412,7 +397,11 @@ static void check_uart(handler_arg_t arg)
     }
 
     if (ser.tx.irq_triggered) {
-        event_post_from_isr(EVENT_QUEUE_APPLI, handle_packet_sent, NULL);
+        ser.tx.irq_triggered = 0;
+        xSemaphoreGiveFromISR(ser.tx.tx_end_event, &yield);
+        if (yield) {
+            portYIELD();
+        }
     }
 }
 
@@ -421,7 +410,7 @@ static int32_t idle_hook_uart(handler_arg_t arg)
 {
     (void)arg;
 
-    if (ser.rx.ready_pkt || ser.tx.irq_triggered) {
+    if (ser.rx.ready_pkt) {
         uart_low_priority_interrupt_trigger();
         return 1;
     }
