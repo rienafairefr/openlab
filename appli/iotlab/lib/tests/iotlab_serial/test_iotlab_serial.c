@@ -195,12 +195,26 @@ static void config_measures(handler_arg_t arg)
 }
 
 
+static uint32_t measures_handler_pkt_free_count = 0;
+static void measures_handler_pkt_free(iotlab_packet_t *packet)
+{
+    measures_handler_pkt_free_count++;
+    iotlab_packet_free(packet);
+}
+
 
 static int32_t measures_handler(uint8_t cmd_type, iotlab_packet_t *packet)
 {
     packet_t *pkt = (packet_t *)packet;
     ASSERT(cmd_type == measures.cmd_type);
     ASSERT(pkt->length == 1);
+
+    // 'free' callback not used by iotlab_serial, may change in the future
+    // will need to use another test method
+    // (like calling it also in our 'free' function)
+    ASSERT(packet->free == iotlab_packet_free);
+
+    packet->free = measures_handler_pkt_free;
 
     if (pkt->data[0]) {
         measures_active = 1;
@@ -236,7 +250,15 @@ static void test_measures()
     ASSERT(measures_active == 0);
 
     // wait current packet transmitted and measure packet also, + margin
-    soft_timer_delay_us(16 * (256) * (NUM_PKTS + 1) + 100);
+    soft_timer_delay_us(16 * (256 + 4) + 100);
+
+    // All commands have been received
+    ASSERT(measures_handler_pkt_free_count == 2);
+    // There are remaining measures
+    ASSERT(iotlab_packet_fifo_count(&tx_packets) != NUM_PKTS);
+
+    // Wait a bit more for remaining messages to be sent
+    soft_timer_delay_us(16 * (256) * NUM_PKTS);
     ASSERT(iotlab_packet_fifo_count(&tx_packets) == NUM_PKTS);
 
     // Two packets for config and the other for measures

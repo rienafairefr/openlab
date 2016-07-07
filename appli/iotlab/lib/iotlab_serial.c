@@ -63,6 +63,7 @@ static void tx_done_isr(handler_arg_t arg);
 
 // Two should be enough for commands,
 #define IOTLAB_SERIAL_NUM_RX_PKTS (2)
+#define IOTLAB_SERIAL_ANSWER_PRIORITY 0x80
 
 
 /*
@@ -178,6 +179,7 @@ int32_t iotlab_serial_call_handler(uint8_t cmd_type, iotlab_packet_t *packet)
 void iotlab_serial_send_result(iotlab_packet_t *packet, uint8_t cmd_type,
         int32_t result)
 {
+    packet->priority = IOTLAB_SERIAL_ANSWER_PRIORITY;
     packet_t *pkt = (packet_t *)packet;
 
     pkt->length = 1;
