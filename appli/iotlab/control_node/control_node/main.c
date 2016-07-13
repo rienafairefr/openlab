@@ -24,6 +24,7 @@
 #include "cn_autotest.h"
 #endif
 #include "cn_radio.h"
+#include "cn_event.h"
 
 int main()
 {
@@ -49,6 +50,7 @@ int main()
 #endif
 
     cn_radio_start();
+    cn_event_start();
 
 #ifdef IOTLAB_CN
     //set the open node power to off and disable battery charge
