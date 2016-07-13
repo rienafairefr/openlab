@@ -1,3 +1,24 @@
+/*******************************************************************************
+# This file is a part of IoT-LAB gateway_code
+# Copyright (C) 2015 INRIA (Contact: admin@iot-lab.info)
+# Contributor(s) : see AUTHORS file
+#
+# This software is governed by the CeCILL license under French law
+# and abiding by the rules of distribution of free software.  You can  use,
+# modify and/ or redistribute the software under the terms of the CeCILL
+# license as circulated by CEA, CNRS and INRIA at the following URL
+# http://www.cecill.info.
+#
+# As a counterpart to the access to the source code and  rights to copy,
+# modify and redistribute granted by the license, users are provided only
+# with a limited warranty  and the software's author,  the holder of the
+# economic rights,  and the successive licensors  have only  limited
+# liability.
+#
+# The fact that you are presently reading this means that you have had
+# knowledge of the CeCILL license and that you accept its terms.
+*******************************************************************************/
+
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
@@ -32,6 +53,7 @@ enum frame_type {
      */
     CONFIG_CONSUMPTION   = 0xCC,
 
+    CONFIG_GPIO          = 0xCD,
 
     /*
      * Asyncronous frames
@@ -44,9 +66,9 @@ enum frame_type {
     RADIO_MEAS_FRAME     = 0xF1,
     RADIO_SNIFFER_FRAME  = 0xF3,
     CONSUMPTION_FRAME    = 0xFC,
+    EVENT_FRAME          = 0xFE,
 
     LOGGER_FRAME         = 0xEE,  // log messages
-
 
     /*
      * Test commands
@@ -57,7 +79,6 @@ enum frame_type {
 
     TEST_PPS             = 0x74,
     TEST_GOT_PPS         = 0x76,
-
 };
 
 enum ack_nack {

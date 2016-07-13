@@ -12,6 +12,7 @@
 /* for flush in reset_time */
 #include "cn_consumption.h"
 #include "cn_radio.h"
+#include "cn_event.h"
 
 #define CN_CONTROL_NUM_ACKS (2)
 
@@ -115,6 +116,7 @@ static void do_set_time(handler_arg_t arg)
     flush_current_consumption_measures();
 #endif
     flush_current_rssi_measures();
+    flush_current_event();
 
     // Send the update frame
     if (iotlab_serial_send_frame(ACK_FRAME, ack_pkt)) {

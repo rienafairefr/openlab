@@ -23,6 +23,7 @@ if(${PLATFORM_HAS_INA226})
         cn_i2c
         cn_autotest
         cn_logger
+        cn_event
         )
     target_link_libraries(control_node
         platform
@@ -31,6 +32,7 @@ if(${PLATFORM_HAS_INA226})
         iotlab_i2c_slave
         iotlab_serial
         iotlab_time
+        iotlab_gpio
         iotlab_leds_util
         zep_sniffer_format
         )
@@ -45,11 +47,13 @@ if (PLATFORM STREQUAL "iotlab-m3")
         cn_control
         cn_radio
         cn_logger
+        cn_event
         )
 target_link_libraries(control_node_m3
         platform
         iotlab_serial
         iotlab_time
+        iotlab_gpio
         iotlab_leds_util
         zep_sniffer_format
     )
