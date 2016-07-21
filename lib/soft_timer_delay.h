@@ -176,6 +176,13 @@ static inline int32_t soft_timer_ticks_to_min(int32_t ticks)
  */
 uint32_t soft_timer_time();
 
+/**
+ * Get the current time, in 32kHz ticks as a 64bit value.
+ *
+ * \return the current time of the Software Timer, in timer ticks
+ */
+uint64_t soft_timer_time_64();
+
 struct soft_timer_timeval
 {
     uint32_t tv_sec;

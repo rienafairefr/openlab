@@ -102,6 +102,12 @@ uint32_t soft_timer_time()
     return (t.update_count << 16) + t.time16;
 }
 
+uint64_t soft_timer_time_64()
+{
+    struct _soft_timer_time t = _soft_timer_time();
+    return (((uint64_t)t.update_count) << 16) + t.time16;
+}
+
 struct soft_timer_timeval soft_timer_time_extended()
 {
     struct soft_timer_timeval tv;
