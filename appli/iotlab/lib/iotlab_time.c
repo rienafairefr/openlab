@@ -1,11 +1,12 @@
 #include "soft_timer_delay.h"
 #include "iotlab_time.h"
 
+#define SOFT_TIMER_FREQUENCY_FIX 32772
 
-static inline uint32_t get_microseconds(uint64_t timer_tick);
-static inline uint32_t get_seconds(uint64_t timer_tick);
+static inline uint32_t get_microseconds(uint64_t timer_tick, uint32_t frequency);
+static inline uint32_t get_seconds(uint64_t timer_tick, uint32_t frequency);
 static inline void ticks_conversion(struct soft_timer_timeval* time,
-        uint64_t timer_tick);
+        uint64_t timer_tick, uint32_t frequency);
 static void get_absolute_time(struct soft_timer_timeval *absolute_time,
         uint32_t timer_tick, uint32_t timer_secs);
 
@@ -65,7 +66,7 @@ static void get_absolute_time(struct soft_timer_timeval *absolute_time,
         uint32_t timer_tick, uint32_t timer_secs)
 {
     uint32_t seconds_s     = timer_secs;
-    uint32_t seconds_ticks = get_seconds(timer_tick);
+    uint32_t seconds_ticks = get_seconds(timer_tick, SOFT_TIMER_FREQUENCY_FIX);
 
     uint32_t final_secs;
 
@@ -101,25 +102,25 @@ static void get_absolute_time(struct soft_timer_timeval *absolute_time,
     final_secs -= (seconds_s & (0x10)) ^ (seconds_ticks & (0x10));
 
     absolute_time->tv_sec = final_secs;
-    absolute_time->tv_usec = get_microseconds(timer_tick);
+    absolute_time->tv_usec = get_microseconds(timer_tick, SOFT_TIMER_FREQUENCY_FIX);
 }
 
-static inline void ticks_conversion(struct soft_timer_timeval* time, uint64_t timer_tick)
+static inline void ticks_conversion(struct soft_timer_timeval* time, uint64_t timer_tick, uint32_t frequency)
 {
-    time->tv_sec = get_seconds(timer_tick);
-    time->tv_usec = get_microseconds(timer_tick);
+    time->tv_sec = get_seconds(timer_tick, frequency);
+    time->tv_usec = get_microseconds(timer_tick, frequency);
 }
 
-static inline uint32_t get_seconds(uint64_t timer_tick)
+static inline uint32_t get_seconds(uint64_t timer_tick, uint32_t frequency)
 {
-    return timer_tick / SOFT_TIMER_FREQUENCY;
+    return timer_tick / frequency;
 }
 
-static inline uint32_t get_microseconds(uint64_t timer_tick)
+static inline uint32_t get_microseconds(uint64_t timer_tick, uint32_t frequency)
 {
     uint64_t aux64;
-    aux64 = (timer_tick % SOFT_TIMER_FREQUENCY);
+    aux64 = (timer_tick % frequency);
     aux64 *= 1000000;  // convert to useconds before dividing to keep as integer
-    aux64 /= SOFT_TIMER_FREQUENCY;
+    aux64 /= frequency;
     return (uint32_t)aux64;
 }
