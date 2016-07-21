@@ -2,8 +2,10 @@
 #include "iotlab_time.h"
 
 
-static inline uint32_t get_microseconds(uint32_t timer_tick);
-static inline uint32_t get_seconds(uint32_t timer_tick);
+static inline uint32_t get_microseconds(uint64_t timer_tick);
+static inline uint32_t get_seconds(uint64_t timer_tick);
+static inline void ticks_conversion(struct soft_timer_timeval* time,
+        uint64_t timer_tick);
 static void get_absolute_time(struct soft_timer_timeval *absolute_time,
         uint32_t timer_tick, uint32_t timer_secs);
 
@@ -102,31 +104,22 @@ static void get_absolute_time(struct soft_timer_timeval *absolute_time,
     absolute_time->tv_usec = get_microseconds(timer_tick);
 }
 
+static inline void ticks_conversion(struct soft_timer_timeval* time, uint64_t timer_tick)
+{
+    time->tv_sec = get_seconds(timer_tick);
+    time->tv_usec = get_microseconds(timer_tick);
+}
 
-
-static inline uint32_t get_seconds(uint32_t timer_tick)
+static inline uint32_t get_seconds(uint64_t timer_tick)
 {
     return timer_tick / SOFT_TIMER_FREQUENCY;
 }
 
-static inline uint32_t get_microseconds(uint32_t timer_tick)
+static inline uint32_t get_microseconds(uint64_t timer_tick)
 {
-    /*
-     * 2^6 is Greatest Common Divisor of one million and 32768,
-     * and (32768 * 1000000 / GCD) <= 2**32 -1
-     */
-
-    uint32_t aux_32;
-    aux_32  = (timer_tick % SOFT_TIMER_FREQUENCY);
-    aux_32 *= (1000000 / (1 << 6));
-    aux_32 /= (SOFT_TIMER_FREQUENCY / (1 << 6));
-    return aux_32;
-
-    /* normal calculation with a 64b
-     * uint64_t aux;
-     * aux  = (timer_tick % SOFT_TIMER_FREQUENCY;
-     * aux *= 1000000; // convert to useconds before dividing to keep as integer
-     * aux /= SOFT_TIMER_FREQUENCY;
-     */
+    uint64_t aux64;
+    aux64 = (timer_tick % SOFT_TIMER_FREQUENCY);
+    aux64 *= 1000000;  // convert to useconds before dividing to keep as integer
+    aux64 /= SOFT_TIMER_FREQUENCY;
+    return (uint32_t)aux64;
 }
-
