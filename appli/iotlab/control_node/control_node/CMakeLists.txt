@@ -48,3 +48,5 @@ target_link_libraries(control_node_m3
         zep_sniffer_format
     )
 endif (PLATFORM STREQUAL "iotlab-m3")
+
+add_subdirectory(tests)
