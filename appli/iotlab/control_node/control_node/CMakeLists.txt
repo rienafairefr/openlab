@@ -12,6 +12,7 @@ include_directories(
 if(${PLATFORM_HAS_INA226})
     add_executable(control_node
         main
+        cn_meas_pkt
         cn_alim
         cn_control
         cn_consumption
@@ -36,6 +37,7 @@ endif(${PLATFORM_HAS_INA226})
 if (PLATFORM STREQUAL "iotlab-m3")
     add_executable(control_node_m3
         main
+        cn_meas_pkt
         cn_control
         cn_radio
         cn_logger

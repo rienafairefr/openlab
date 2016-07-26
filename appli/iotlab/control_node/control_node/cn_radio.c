@@ -4,6 +4,7 @@
 #include "constants.h"
 #include "cn_radio.h"
 #include "cn_control.h"
+#include "cn_meas_pkt.h"
 #include "iotlab_serial.h"
 #include "iotlab_time.h"
 #include "zep_sniffer_format.h"
@@ -55,7 +56,6 @@ static struct
     /* Radio RX commands */
     struct {
         iotlab_packet_t *serial_pkt;
-        uint32_t t_ref_s;
     } rssi;
     struct {
         phy_packet_t pkt_buf[2];
@@ -126,14 +126,7 @@ void cn_radio_start()
 
 void flush_current_rssi_measures()
 {
-    iotlab_packet_t *packet = radio.rssi.serial_pkt;
-
-    if (NULL == packet)
-        return;
-    if (iotlab_serial_send_frame(RADIO_MEAS_FRAME, packet))
-        iotlab_packet_call_free(packet);  // send fail
-
-    radio.rssi.serial_pkt = NULL;
+    cn_meas_pkt_flush(&radio.rssi.serial_pkt, RADIO_MEAS_FRAME);
 }
 
 static void proper_stop()
@@ -254,58 +247,27 @@ static void poll_time(handler_arg_t arg)
     int32_t ed = 0;
     struct soft_timer_timeval timestamp;
     iotlab_packet_t *packet;
+    uint8_t channel = (uint8_t) radio.current_channel;
 
     phy_ed(platform_phy, &ed);
     iotlab_time_extend_relative(&timestamp, soft_timer_time());
 
-    if (NULL == radio.rssi.serial_pkt) {
-        /* alloc and init new packet */
-        packet = iotlab_serial_packet_alloc(&radio.measures_queue);
-        if (NULL == packet)
-            return;  // FAIL: drop measure
+    packet = cn_meas_pkt_lazy_alloc(&radio.measures_queue,
+                                    radio.rssi.serial_pkt, &timestamp);
+    if ((radio.rssi.serial_pkt = packet) == NULL)
+        goto poll_time_end;  // alloc failed, drop this measure
 
-        /* Init new packet */
-        radio.rssi.serial_pkt = packet;
-        ((packet_t *)packet)->data[0] = 0;
-        ((packet_t *)packet)->length  = 1;
+    /* Add measure time + rssi measure*/
+    struct cn_meas rssi[] = {{&channel, sizeof(uint8_t)},
+                             {&ed, sizeof(uint8_t)},
+                             {NULL, 0}};
+    int send = cn_meas_pkt_add_measure(
+            packet, &timestamp, RSSI_MEASURE_SIZE, rssi);
 
-        /* Save time reference and write it in packet */
-        radio.rssi.t_ref_s = timestamp.tv_sec;
-        iotlab_packet_append_data(packet, &timestamp.tv_sec, sizeof(uint32_t));
-    }
-    packet = radio.rssi.serial_pkt;
-
-
-    /*
-     * Add measure
-     */
-    ((packet_t *)packet)->data[0]++;
-
-    // store the number of µs since t_ref_s
-    uint32_t usecs;
-    usecs = timestamp.tv_usec;
-    usecs += (timestamp.tv_sec - radio.rssi.t_ref_s) * SEC;
-    iotlab_packet_append_data(packet, &usecs, sizeof(uint32_t));
-
-    // rssi measure
-    uint8_t channel = (uint8_t) radio.current_channel;
-    iotlab_packet_append_data(packet, &channel, sizeof(uint8_t));
-    iotlab_packet_append_data(packet, &ed, sizeof(uint8_t));
-
-
-    /* Send packet if full or too old */
-    int send_packet = 0;
-    // packet full
-    if (iotlab_serial_packet_free_space(packet) < RSSI_MEASURE_SIZE)
-        send_packet = 1;
-    // no pkt sent for more than a second or two
-    if (usecs > (2 * SEC))
-        send_packet = 1;
-
-    if (send_packet)
+    if (send)
         flush_current_rssi_measures();
 
-
+poll_time_end:
     /* Is it time to switch channel ? */
     manage_channel_switch();
 }
