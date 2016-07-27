@@ -12,13 +12,15 @@ static void get_absolute_time(struct soft_timer_timeval *absolute_time,
 static uint64_t get_extended_time(uint32_t timer_tick, uint64_t timer_tick_64) __attribute__ ((unused));  // Before using
 
 
-struct soft_timer_timeval time0 = {0, 0};
+uint64_t time0 = 0;
 struct soft_timer_timeval unix_time_ref = {0, 0};
 
-void iotlab_time_set_time(struct soft_timer_timeval *t0,
-        struct soft_timer_timeval *time_ref)
+void iotlab_time_set_time(uint32_t t0, struct soft_timer_timeval *time_ref)
 {
-    time0 = *t0;
+    uint64_t now64 = soft_timer_time_64();
+
+    time0 = get_extended_time(t0, now64);
+
     unix_time_ref = *time_ref;
 }
 
@@ -26,12 +28,15 @@ void iotlab_time_set_time(struct soft_timer_timeval *t0,
 static void iotlab_time_convert(struct soft_timer_timeval *time)
 {
     /* Set time relative to time0 */
-    time->tv_sec -= time0.tv_sec;
-    if (time->tv_usec < time0.tv_usec) {
+    struct soft_timer_timeval time0_timeval;
+    ticks_conversion(&time0_timeval, time0, SOFT_TIMER_FREQUENCY_FIX);
+
+    time->tv_sec -= time0_timeval.tv_sec;
+    if (time->tv_usec < time0_timeval.tv_usec) {
         time->tv_usec += 1000000;
         time->tv_sec  -= 1;
     }
-    time->tv_usec -= time0.tv_usec;
+    time->tv_usec -= time0_timeval.tv_usec;
 
     /* Add unix time */
     time->tv_sec  += unix_time_ref.tv_sec;
