@@ -1,16 +1,14 @@
 #ifndef IOTLAB_TIME_H
 #define IOTLAB_TIME_H
 
-// "Implememnation assumes SOFT_TIMER_FREQUENCY == 32768"
-
-extern struct soft_timer_timeval time0;
+extern uint64_t time0;
 extern struct soft_timer_timeval unix_time_ref;
 
-/* Sets t0 as 'soft_timer_time' reference in time0 and
+/*
+ * Sets t0 as 64b reference in time0 and
  * save time_ref in unix_time_ref
  */
-void iotlab_time_set_time(struct soft_timer_timeval *t0,
-        struct soft_timer_timeval *time_ref);
+void iotlab_time_set_time(uint32_t t0, struct soft_timer_timeval *time_ref);
 
 /*
  * Extend given timer_tick in ticks to a struct soft_timer_timeval
