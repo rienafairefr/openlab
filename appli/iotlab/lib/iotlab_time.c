@@ -9,6 +9,7 @@ static inline void ticks_conversion(struct soft_timer_timeval* time,
         uint64_t timer_tick, uint32_t frequency);
 static void get_absolute_time(struct soft_timer_timeval *absolute_time,
         uint32_t timer_tick, uint32_t timer_secs);
+static uint64_t get_extended_time(uint32_t timer_tick, uint64_t timer_tick_64) __attribute__ ((unused));  // Before using
 
 
 struct soft_timer_timeval time0 = {0, 0};
@@ -103,6 +104,22 @@ static void get_absolute_time(struct soft_timer_timeval *absolute_time,
 
     absolute_time->tv_sec = final_secs;
     absolute_time->tv_usec = get_microseconds(timer_tick, SOFT_TIMER_FREQUENCY_FIX);
+}
+
+
+/*
+ * Extend to 64bit a past 32 bits 'ticks' timer using current 64 ticks timer.
+ */
+static uint64_t get_extended_time(uint32_t timer_tick, uint64_t timer_tick_64)
+{
+    // Get the big part from the 64 bit timer, and the small from the 32 bit timer.
+    uint64_t absolute_time = (timer_tick_64 & (~0xFFFFFFFFull)) | timer_tick;
+
+    // remove the 'overflow' if necessary
+    if ((timer_tick_64 & 0x80000000) < (timer_tick & 0x80000000))
+        absolute_time -= 0x100000000;
+
+    return absolute_time;
 }
 
 static inline void ticks_conversion(struct soft_timer_timeval* time, uint64_t timer_tick, uint32_t frequency)
