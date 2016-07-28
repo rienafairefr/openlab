@@ -8,8 +8,8 @@ static inline uint32_t get_seconds(uint64_t timer_tick, uint32_t frequency);
 static inline void ticks_conversion(struct soft_timer_timeval* time,
         uint64_t timer_tick, uint32_t frequency);
 static void get_absolute_time(struct soft_timer_timeval *absolute_time,
-        uint32_t timer_tick, uint32_t timer_secs);
-static uint64_t get_extended_time(uint32_t timer_tick, uint64_t timer_tick_64) __attribute__ ((unused));  // Before using
+        uint32_t timer_tick, uint32_t timer_secs) __attribute__ ((unused));  // before removing
+static uint64_t get_extended_time(uint32_t timer_tick, uint64_t timer_tick_64);
 
 
 uint64_t time0 = 0;
@@ -25,18 +25,13 @@ void iotlab_time_set_time(uint32_t t0, struct soft_timer_timeval *time_ref)
 }
 
 
-static void iotlab_time_convert(struct soft_timer_timeval *time)
+static void iotlab_time_convert(struct soft_timer_timeval *time, uint64_t timer_tick_64)
 {
-    /* Set time relative to time0 */
-    struct soft_timer_timeval time0_timeval;
-    ticks_conversion(&time0_timeval, time0, SOFT_TIMER_FREQUENCY_FIX);
-
-    time->tv_sec -= time0_timeval.tv_sec;
-    if (time->tv_usec < time0_timeval.tv_usec) {
-        time->tv_usec += 1000000;
-        time->tv_sec  -= 1;
-    }
-    time->tv_usec -= time0_timeval.tv_usec;
+    /*
+     * Frequency scaling should only be used to convert the ticks
+     *       between 'time0' and 'timer_tick_64'.
+     */
+    ticks_conversion(time, timer_tick_64 - time0, SOFT_TIMER_FREQUENCY_FIX);
 
     /* Add unix time */
     time->tv_sec  += unix_time_ref.tv_sec;
@@ -53,10 +48,10 @@ static void iotlab_time_convert(struct soft_timer_timeval *time)
 void iotlab_time_extend_relative(struct soft_timer_timeval *time,
         uint32_t timer_tick)
 {
-    /* extend timer_tick to timeval */
-    *time = soft_timer_time_extended();
-    get_absolute_time(time, timer_tick, time->tv_sec);
-    iotlab_time_convert(time);
+    uint64_t now64 = soft_timer_time_64();
+    uint64_t timer_tick_64 = get_extended_time(timer_tick, now64);
+
+    iotlab_time_convert(time, timer_tick_64);
 }
 
 
