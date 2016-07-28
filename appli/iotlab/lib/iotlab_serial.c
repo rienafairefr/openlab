@@ -199,6 +199,7 @@ static void char_rx(handler_arg_t arg, uint8_t c)
      */
     static uint16_t rx_index = 0;
     static uint32_t last_start_time = 0;
+    uint32_t timestamp = soft_timer_time();
 
     // Check for ready buffer
     if (ser.rx.rx_pkt == NULL)
@@ -211,8 +212,8 @@ static void char_rx(handler_arg_t arg, uint8_t c)
 
     // Check if packet started too long ago
     if (last_start_time
-            && (soft_timer_time() - last_start_time
-                    > soft_timer_ms_to_ticks(100)))
+            && (timestamp - last_start_time
+                > soft_timer_ms_to_ticks(100)))
     {
         // Reset index
         rx_index = 0;
@@ -226,10 +227,10 @@ static void char_rx(handler_arg_t arg, uint8_t c)
             if (c != SYNC_BYTE)
                 return;  // Abort
             // Store time
-            last_start_time = soft_timer_time();
+            last_start_time = timestamp;
 
             // Rx start timestamp
-            ser.rx.rx_pkt->timestamp = soft_timer_time();
+            ser.rx.rx_pkt->timestamp = timestamp;
             break;
         case 1:
             // length byte
