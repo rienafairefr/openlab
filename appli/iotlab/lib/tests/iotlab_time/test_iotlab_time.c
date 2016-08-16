@@ -75,6 +75,57 @@ static void test_time_extend()
     _test_extend(0x2135FFFFFFFFull, 0x0000213600000000ull );
 }
 
+static void test_convert_stability()
+{
+    struct soft_timer_timeval t1, t2, t3, t4, t0_ref;
+    struct soft_timer_timeval t1_after, t2_after, t3_after, t4_after, t_utc_update;
+
+    /* First set_time to initialize test time */
+    uint64_t t0 = soft_timer_time_64();
+    iotlab_time_convert(&t0_ref, t0);
+
+    iotlab_time_set_time(t0, &t0_ref);
+    soft_timer_delay_us(5000);
+
+    /* Save a clock tick every 2 ms */
+    uint64_t time1 = soft_timer_time_64();
+    soft_timer_delay_us(2000);
+    uint64_t time2 = soft_timer_time_64();
+    soft_timer_delay_us(2000);
+    uint64_t time3 = soft_timer_time_64();
+    soft_timer_delay_us(2000);
+    uint64_t time4 = soft_timer_time_64();
+    soft_timer_delay_us(2000);
+
+    /* Convert clock tick to real time */
+    iotlab_time_convert(&t1, time1);
+    iotlab_time_convert(&t2, time2);
+    iotlab_time_convert(&t3, time3);
+    iotlab_time_convert(&t4, time4);
+
+    /* New set_time */
+    uint64_t t_update = soft_timer_time_64();
+    iotlab_time_convert(&t_utc_update, t_update + 10000);
+    soft_timer_delay_ms(1);
+    iotlab_time_set_time(t_update, &t_utc_update);
+
+    /* Convert old ticks after new set time */
+    iotlab_time_convert(&t1_after, time1);
+    iotlab_time_convert(&t2_after, time2);
+    iotlab_time_convert(&t3_after, time3);
+    iotlab_time_convert(&t4_after, time4);
+
+    /* Check that conversion of the ticks before and after the last set_time are equal */
+    ASSERT(t1.tv_sec == t1_after.tv_sec);
+    ASSERT(t2.tv_sec == t2_after.tv_sec);
+    ASSERT(t3.tv_sec == t3_after.tv_sec);
+    ASSERT(t4.tv_sec == t4_after.tv_sec);
+    ASSERT(t1.tv_usec == t1_after.tv_usec);
+    ASSERT(t2.tv_usec == t2_after.tv_usec);
+    ASSERT(t3.tv_usec == t3_after.tv_usec);
+    ASSERT(t4.tv_usec == t4_after.tv_usec);
+}
+
 
 static void test_app(void *arg)
 {
@@ -82,6 +133,7 @@ static void test_app(void *arg)
     log_info("Running tests");
 
     test_time_extend();
+    test_convert_stability();
 
     log_info("Tests finished");
 
