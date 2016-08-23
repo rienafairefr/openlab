@@ -99,6 +99,10 @@ static struct {
 
 void iotlab_serial_start(uint32_t baudrate)
 {
+    /* compatibility with HiKoB */
+    if (uart_external == NULL)
+        uart_external = uart_print;
+
     uart_enable(uart_external, baudrate);
     iotlab_packet_init_queue(&ser.rx.queue,
             ser.rx.packets, IOTLAB_SERIAL_NUM_RX_PKTS);
