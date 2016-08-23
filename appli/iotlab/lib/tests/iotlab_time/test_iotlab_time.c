@@ -126,6 +126,32 @@ static void test_convert_stability()
     ASSERT(t4.tv_usec == t4_after.tv_usec);
 }
 
+static void reset_time_config()
+{
+    int i;
+    struct iotlab_time_config null = {0, {0, 0}, 0, SOFT_TIMER_KFREQUENCY_FIX};
+    for (i = 0; i < NUM_SAVED_CONFIG + 1; i++)
+        time_config[i] = null;
+}
+
+static void test_time_convert()
+{
+    reset_time_config();
+
+    /* Initialize set_time */
+    uint64_t t0 = soft_timer_time_64();
+    struct soft_timer_timeval time_ref = {1471960848, 400000};
+    struct soft_timer_timeval t1_utc;
+    iotlab_time_set_time(t0, &time_ref);
+
+    uint64_t t1 = 0;
+    iotlab_time_convert(&t1_utc, t1);
+
+    /* Check that for a tick count of 0, the conversion is 0,0 */
+    ASSERT(t1_utc.tv_sec == 0);
+    ASSERT(t1_utc.tv_usec == 0);
+}
+
 
 static void test_app(void *arg)
 {
@@ -134,6 +160,7 @@ static void test_app(void *arg)
 
     test_time_extend();
     test_convert_stability();
+    test_time_convert();
 
     log_info("Tests finished");
 
