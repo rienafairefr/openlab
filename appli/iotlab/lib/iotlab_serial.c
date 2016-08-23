@@ -172,16 +172,6 @@ iotlab_packet_t *iotlab_serial_packet_alloc(iotlab_packet_queue_t *queue)
     return iotlab_packet_alloc(queue, IOTLAB_SERIAL_HEADER_SIZE);
 }
 
-// Transitional functions
-iotlab_packet_t *_iotlab_serial_packet_alloc()
-{
-    return iotlab_serial_packet_alloc(&ser.rx.queue);
-}
-void iotlab_serial_append_data(packet_t *pkt, void *data, size_t size)
-{
-    iotlab_packet_append_data((iotlab_packet_t *)pkt, data, size);
-}
-
 
 int32_t iotlab_serial_packet_free_space(iotlab_packet_t *packet)
 {

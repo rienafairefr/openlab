@@ -70,9 +70,6 @@ typedef struct {
 } iotlab_serial_handler_t;
 
 iotlab_packet_t *iotlab_serial_packet_alloc(iotlab_packet_queue_t *queue);
-// Transitional functions
-iotlab_packet_t *_iotlab_serial_packet_alloc();
-void iotlab_serial_append_data(packet_t *pkt, void *data, size_t size);
 
 /**
  * Register a serial handler.
