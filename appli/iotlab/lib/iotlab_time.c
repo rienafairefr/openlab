@@ -11,6 +11,7 @@ static inline uint32_t get_seconds(uint64_t timer_tick, uint32_t kfrequency);
 static inline void ticks_conversion(struct soft_timer_timeval* time,
         uint64_t timer_tick, uint32_t kfrequency);
 static uint64_t get_extended_time(uint32_t timer_tick, uint64_t timer_tick_64);
+static uint32_t _iotlab_time_adjusted_kfrequency();
 
 struct iotlab_time_config {
     uint64_t time0;
@@ -26,6 +27,9 @@ static struct iotlab_time_config time_config[1 + NUM_SAVED_CONFIG] = {
     [0 ... NUM_SAVED_CONFIG] =
     {0, {0, 0}, SOFT_TIMER_KFREQUENCY_FIX, 0}};
 
+/* Select if frequency should be adapted dynamically. Makes testing easier. */
+static int adapt_frequency = 1;
+
 
 void iotlab_time_set_time(uint32_t t0, struct soft_timer_timeval *time_ref)
 {
@@ -38,6 +42,46 @@ void iotlab_time_set_time(uint32_t t0, struct soft_timer_timeval *time_ref)
     time_config[0].unix_time_ref = *time_ref;
     time_config[0].kfrequency = SOFT_TIMER_KFREQUENCY_FIX;
     time_config[0].last_set_time = now64;
+
+    if (adapt_frequency) {
+        /* Adapt frequency dynamically */
+        time_config[0].kfrequency = _iotlab_time_adjusted_kfrequency();
+    }
+}
+
+#define USEC_IN_S (1000000)
+
+static uint64_t _timeval_to_us(struct soft_timer_timeval *time)
+{
+    uint64_t time_us = 0;
+    time_us += time->tv_usec;
+    time_us += ((uint64_t)time->tv_sec) * USEC_IN_S;
+
+    return time_us;
+}
+
+/* Returns observed frequency since last measure.
+ * No filtering
+ */
+static uint32_t _iotlab_time_adjusted_kfrequency()
+{
+    uint32_t adjusted_kfreq = SOFT_TIMER_KFREQUENCY_FIX;
+
+    /* First set time, used default value */
+    if (time_config[1].time0 == 0)
+        return adjusted_kfreq;
+
+    uint64_t time_ref_0_us = _timeval_to_us(&time_config[0].unix_time_ref);
+    uint64_t time_ref_1_us = _timeval_to_us(&time_config[1].unix_time_ref);
+
+    uint64_t unix_time_diff_us = time_ref_0_us - time_ref_1_us;
+    uint64_t tick_diff = time_config[0].time0 - time_config[1].time0;
+
+    /* Freq == tick_diff / unix_time_diff_seconds.
+     * Adjust for kfreq and diff_us */
+    adjusted_kfreq = ((1000 * tick_diff * USEC_IN_S) / unix_time_diff_us);
+
+    return adjusted_kfreq;
 }
 
 static struct iotlab_time_config *select_config(uint64_t timer_tick_64)
