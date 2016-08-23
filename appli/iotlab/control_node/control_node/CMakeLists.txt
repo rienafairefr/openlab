@@ -12,6 +12,7 @@ include_directories(
 if(${PLATFORM_HAS_INA226})
     add_executable(control_node
         main
+        cn_alim
         cn_control
         cn_consumption
         cn_radio
