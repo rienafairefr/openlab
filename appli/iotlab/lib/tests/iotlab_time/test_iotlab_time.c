@@ -72,8 +72,7 @@ static void test_time_extend()
 
     /* This should not overflow */
     _test_extend(0x12347FFF1234ull, 0x000012348000AAAAull);
-
-    // TODO add other tests...
+    _test_extend(0x2135FFFFFFFFull, 0x0000213600000000ull );
 }
 
 
