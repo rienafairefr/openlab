@@ -1,8 +1,4 @@
-# Add the test directory
-
-
-if(${PLATFORM_HAS_INA226})
-    include_directories(
+include_directories(
     ${PROJECT_SOURCE_DIR}/drivers/stm32f1xx
     ${PROJECT_SOURCE_DIR}/drivers/cortex-m3
     ${PROJECT_SOURCE_DIR}/drivers/stm32
@@ -12,6 +8,8 @@ if(${PLATFORM_HAS_INA226})
     ${PROJECT_SOURCE_DIR}/appli/iotlab/autotest_common
     ${PROJECT_SOURCE_DIR}/appli/iotlab/lib
     )
+
+if(${PLATFORM_HAS_INA226})
     add_executable(control_node
         main
         cn_control
