@@ -49,7 +49,7 @@ int main()
     cn_autotest_start();
     cn_logger_reset();
 
-    //set the open node power to off and charge the battery
+    //set the open node power to off and disable battery charge
     fiteco_lib_gwt_opennode_power_select(FITECO_GWT_OPENNODE_POWER__OFF);
     fiteco_lib_gwt_battery_charge_disable();
 
