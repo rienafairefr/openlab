@@ -5,7 +5,6 @@
 #include "iotlab_time.h"
 #include "iotlab_leds.h"
 #include "iotlab_leds_util.h"
-#include "fiteco_lib_gwt.h"
 
 #include "constants.h"
 #include "cn_control.h"
@@ -16,21 +15,14 @@
 
 static struct {
 
-    void (*pre_stop_cmd)();
-    void (*post_start_cmd)();
     uint16_t node_id;
 
 
 } cn_control = {
-    .pre_stop_cmd = NULL,
-    .post_start_cmd = NULL,
     .node_id = 0,
 };
 
 
-
-static int32_t on_start(uint8_t cmd_type, packet_t *pkt);
-static int32_t on_stop(uint8_t cmd_type, packet_t *pkt);
 
 static int32_t set_time(uint8_t cmd_type, packet_t *pkt);
 static void do_set_time(handler_arg_t arg);
@@ -45,19 +37,6 @@ static int32_t green_led_on(uint8_t cmd_type, packet_t *pkt);
 void cn_control_start()
 {
     // Configure and register all handlers
-
-    static iotlab_serial_handler_t handler_start = {
-        .cmd_type = OPEN_NODE_START,
-        .handler = on_start,
-    };
-    iotlab_serial_register_handler(&handler_start);
-    static iotlab_serial_handler_t handler_stop = {
-        .cmd_type = OPEN_NODE_STOP,
-        .handler = on_stop,
-    };
-    iotlab_serial_register_handler(&handler_stop);
-
-
     // set_time
     static iotlab_serial_handler_t handler_set_time = {
         .cmd_type = SET_TIME,
@@ -84,62 +63,6 @@ void cn_control_start()
         .handler = green_led_on,
     };
     iotlab_serial_register_handler(&handler_green_led_on);
-}
-
-void cn_control_config(void (*pre_stop_cmd)(), void (*post_start_cmd)())
-{
-    cn_control.pre_stop_cmd = pre_stop_cmd;
-    cn_control.post_start_cmd = post_start_cmd;
-}
-
-static int32_t on_start(uint8_t cmd_type, packet_t *pkt)
-{
-    if (1 != pkt->length)
-        return 1;
-
-    if (DC_CHARGE == *pkt->data) {
-        fiteco_lib_gwt_opennode_power_select(FITECO_GWT_OPENNODE_POWER__MAIN);
-        fiteco_lib_gwt_battery_charge_enable();
-    } else if (DC_NO_CHARGE == *pkt->data) {
-        fiteco_lib_gwt_opennode_power_select(FITECO_GWT_OPENNODE_POWER__MAIN);
-        fiteco_lib_gwt_battery_charge_disable();
-    } else if (BATTERY == *pkt->data) {
-        fiteco_lib_gwt_opennode_power_select(FITECO_GWT_OPENNODE_POWER__BATTERY);
-        fiteco_lib_gwt_battery_charge_disable();
-    } else {
-        //unexpected value
-        return 1;
-    }
-
-    // Run a pre_stop command before stoping
-    if (cn_control.post_start_cmd != NULL)
-        cn_control.post_start_cmd();
-
-    return 0;
-}
-
-static int32_t on_stop(uint8_t cmd_type, packet_t *pkt)
-{
-    if (1 != pkt->length)
-        return 1;
-
-    // Run a pre_stop command before stoping
-    if (cn_control.pre_stop_cmd != NULL)
-        cn_control.pre_stop_cmd();
-
-    fiteco_lib_gwt_opennode_power_select(FITECO_GWT_OPENNODE_POWER__OFF);
-
-    // Charge if DC
-    if (DC_CHARGE == *pkt->data)
-        fiteco_lib_gwt_battery_charge_enable();
-    else if (DC_NO_CHARGE == *pkt->data)
-        fiteco_lib_gwt_battery_charge_disable();
-    else if (BATTERY == *pkt->data)
-        fiteco_lib_gwt_battery_charge_disable();
-    else
-        return 1;
-
-    return 0;
 }
 
 static struct {
@@ -177,7 +100,9 @@ static void do_set_time(handler_arg_t arg)
     /*
      * Flush measures packets
      */
+#ifdef IOTLAB_CN
     flush_current_consumption_measures();
+#endif
     flush_current_rssi_measures();
 
     // Send the update frame
