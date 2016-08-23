@@ -6,3 +6,7 @@ add_subdirectory(control_node)
 # add_subdirectory(controlnode_clement)
 
 endif (PLATFORM STREQUAL "iotlab-cn")
+
+if (PLATFORM STREQUAL "iotlab-m3")
+    add_subdirectory(control_node)
+endif (PLATFORM STREQUAL "iotlab-m3")

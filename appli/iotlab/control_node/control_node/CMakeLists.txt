@@ -33,3 +33,20 @@ if(${PLATFORM_HAS_INA226})
         )
 # add_subdirectory(test_cn)
 endif(${PLATFORM_HAS_INA226})
+
+if (PLATFORM STREQUAL "iotlab-m3")
+    add_executable(control_node_m3
+        main
+        cn_control
+        cn_radio
+        cn_logger
+        )
+target_link_libraries(control_node_m3
+        platform
+        packet
+        iotlab_serial
+        iotlab_time
+        iotlab_leds_util
+        zep_sniffer_format
+    )
+endif (PLATFORM STREQUAL "iotlab-m3")

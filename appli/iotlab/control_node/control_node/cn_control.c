@@ -100,7 +100,9 @@ static void do_set_time(handler_arg_t arg)
     /*
      * Flush measures packets
      */
+#ifdef IOTLAB_CN
     flush_current_consumption_measures();
+#endif
     flush_current_rssi_measures();
 
     // Send the update frame
