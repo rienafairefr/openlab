@@ -2,7 +2,8 @@
 #include "iotlab_time.h"
 
 // 1000 real soft timer frequency
-#define SOFT_TIMER_KFREQUENCY_FIX 32772000
+//     72000000. / (72000000 / 32768) == 32771.96176604461
+#define SOFT_TIMER_KFREQUENCY_FIX 32771962
 
 static inline uint32_t get_microseconds(uint64_t timer_tick, uint32_t kfrequency);
 static inline uint32_t get_seconds(uint64_t timer_tick, uint32_t kfrequency);
