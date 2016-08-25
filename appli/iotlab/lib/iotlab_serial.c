@@ -30,12 +30,6 @@
 #include "debug.h"
 #include "event.h"
 
-#if defined(RELEASE) && RELEASE
-#define ASYNCHRONOUS 1
-#else // ASYNCHRONOUS
-#define ASYNCHRONOUS 0
-#endif // ASYNCHRONOUS
-
 enum
 {
     SYNC_BYTE = 0x80,
@@ -53,10 +47,8 @@ static void allocate_rx_packet(handler_arg_t arg);
 static void packet_received(handler_arg_t arg);
 static void send_now(handler_arg_t arg);
 
-#if ASYNCHRONOUS
 /** Function called at the end of a UART TX transfer */
 static void tx_done_isr(handler_arg_t arg);
-#endif // ASYNCHRONOUS
 
 
 // Two should be enough for commands,
@@ -347,21 +339,14 @@ static void send_now(handler_arg_t arg)
     ser.tx.pkt->timestamp = soft_timer_time();
 
     // Start sending the packet
-#if ASYNCHRONOUS
     uart_transfer_async(uart_external, pkt->raw_data, pkt->length,
             tx_done_isr, NULL);
-#else // ASYNCHRONOUS
-    uart_transfer(uart_external, pkt->raw_data, pkt->length);
-    event_post(EVENT_QUEUE_APPLI, handle_packet_sent, NULL);
-#endif // ASYNCHRONOUS
 }
 
-#if ASYNCHRONOUS
 static void tx_done_isr(handler_arg_t arg)
 {
     ser.tx.irq_triggered = 1;
 }
-#endif // ASYNCHRONOUS
 
 static void handle_packet_sent(handler_arg_t arg)
 {
