@@ -30,12 +30,6 @@ int main()
     // Initialize the platform
     platform_init();
 
-    /* compatibility with HiKoB */
-    if (uart_external == NULL)
-        uart_external = uart_print;
-    else
-        uart_enable(uart_external, 500000);
-
     // Start the soft timer
     soft_timer_init();
 

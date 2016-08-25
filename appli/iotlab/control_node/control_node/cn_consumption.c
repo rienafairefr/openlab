@@ -12,6 +12,7 @@
 #include "cn_logger.h"
 #include "fiteco_lib_gwt.h"
 #include "cn_consumption.h"
+#include "cn_meas_pkt.h"
 
 
 enum {
@@ -37,7 +38,6 @@ struct consumption_config {
 #endif
 
     iotlab_packet_t *pkt;
-    uint32_t t_ref_s;
 };
 
 #define MEASURES_PRIORITY 0
@@ -249,63 +249,27 @@ static void consumption_measure_handler(handler_arg_t arg,
 
     iotlab_time_extend_relative(&timestamp, measure_time_ticks);
 
-    if (NULL == cur_config.pkt) {
-        /*
-         * alloc and init a new packet
-         */
-        packet = iotlab_serial_packet_alloc(&measures_queue);
-        if (NULL == packet)
-            return;  // alloc failed, drop this measure
+    packet = cn_meas_pkt_lazy_alloc(&measures_queue, cur_config.pkt,
+                                    &timestamp);
+    if ((cur_config.pkt = packet) == NULL)
+        return;  // alloc failed, drop this measure
 
-        /*
-         * init new measure packet
-         */
-        cur_config.pkt = packet;
-        ((packet_t *)packet)->data[0] = 0;  // empty packet
-        ((packet_t *)packet)->length  = 1;  // measures number byte
-
-        /*
-         * Save time reference and write it in packet
-         */
-        cur_config.t_ref_s = timestamp.tv_sec;  // time reference
-        iotlab_packet_append_data(packet, &cur_config.t_ref_s, sizeof(uint32_t));
-    }
-    packet = cur_config.pkt;
-
-    /*
-     * add measure
-     */
-    ((packet_t *)packet)->data[0]++;
-
-    /* store the number of µs since t_ref_s */
-    uint32_t usecs;
-    usecs = timestamp.tv_usec;
-    usecs += (timestamp.tv_sec - cur_config.t_ref_s) * SEC;
-    iotlab_packet_append_data(packet, &usecs, sizeof(uint32_t));
-
-    /* Add power consumption values */
+    /* Fill consumption according to config */
+    struct cn_meas consumption[4] = {{NULL, 0}};
+    int i = 0;
     if (cur_config.p)
-        iotlab_packet_append_data(packet, &p, sizeof(float));
+        consumption[i++] = (struct cn_meas){&p, sizeof(float)};
     if (cur_config.v)
-        iotlab_packet_append_data(packet, &v, sizeof(float));
+        consumption[i++] = (struct cn_meas){&v, sizeof(float)};
     if (cur_config.c)
-        iotlab_packet_append_data(packet, &c, sizeof(float));
+        consumption[i++] = (struct cn_meas){&c, sizeof(float)};
+    consumption[i] = (struct cn_meas){NULL, 0};
 
-
-    /*
-     * Check is packet should be sent
-     */
-    int send_packet = 0;
-
-    // Packet full
-    if (iotlab_serial_packet_free_space(packet) < cur_config.measure_size)
-        send_packet = 1;
-
-    // No packet has been sent for a long time: around one or two seconds
-    if (usecs > (2 * SEC))
-        send_packet = 1;
-
-    if (send_packet)
+    /* Add measure time + consumption */
+    int send = cn_meas_pkt_add_measure(packet, &timestamp,
+                                       cur_config.measure_size,
+                                       consumption);
+    if (send)
         flush_current_consumption_measures();
 }
 
@@ -327,12 +291,5 @@ static iotlab_packet_t *alloc_pw_ack_frame(uint8_t pw_config)
 
 void flush_current_consumption_measures()
 {
-    iotlab_packet_t *packet = cur_config.pkt;
-
-    if (NULL == packet)
-        return;
-    if (iotlab_serial_send_frame(CONSUMPTION_FRAME, packet))
-        iotlab_packet_call_free(packet); // send fail
-
-    cur_config.pkt = NULL;
+    cn_meas_pkt_flush(&cur_config.pkt, CONSUMPTION_FRAME);
 }

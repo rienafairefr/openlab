@@ -23,18 +23,19 @@
  *  Created on: Aug 12, 2013
  *      Author: burindes
  */
+#include "FreeRTOS.h"
+#include "semphr.h"
 #include "platform.h"
+
+#include "nvic_.h"
+#include "exti.h"
+#include "cm3_nvic_registers.h"
+
 #include "iotlab_leds.h"
 #include "iotlab_serial.h"
 
 #include "debug.h"
 #include "event.h"
-
-#if defined(RELEASE) && RELEASE
-#define ASYNCHRONOUS 1
-#else // ASYNCHRONOUS
-#define ASYNCHRONOUS 0
-#endif // ASYNCHRONOUS
 
 enum
 {
@@ -45,26 +46,37 @@ enum
 };
 
 /** Handler for IDLE check */
-static int32_t check_uart(handler_arg_t arg);
+static int32_t idle_hook_uart(handler_arg_t arg);
 /** Handler for character received */
 static void char_rx(handler_arg_t arg, uint8_t c);
+/** Handler for second interrupt */
+static void check_uart(handler_arg_t arg);
+static void uart_low_priority_interrupt_init(handler_t handler);
+static void uart_low_priority_interrupt_trigger();
 
 static void allocate_rx_packet(handler_arg_t arg);
+static void iotlab_serial_tx_task(void *param);
 static void packet_received(handler_arg_t arg);
-static void send_now(handler_arg_t arg);
+static void send_packet(iotlab_packet_t *packet);
 
-#if ASYNCHRONOUS
+
 /** Function called at the end of a UART TX transfer */
 static void tx_done_isr(handler_arg_t arg);
-#endif // ASYNCHRONOUS
 
 
 // Two should be enough for commands,
 #define IOTLAB_SERIAL_NUM_RX_PKTS (2)
+#define IOTLAB_SERIAL_ANSWER_PRIORITY 0x80
 
 
-/** */
-static void handle_packet_sent(handler_arg_t arg);
+/*
+ * Uart low priority interruption
+ * Using an EXTI_LINE to simulate software interrupt
+ */
+
+#define  NVIC_IOTLAB_SERIAL_IRQ_LINE  NVIC_IRQ_LINE_EXTI2
+#define  NVIC_IOTLAB_SERIAL_EXTI_LINE EXTI_LINE_Px2
+
 
 static struct {
     iotlab_serial_handler_t *first_handler;
@@ -79,6 +91,9 @@ static struct {
 
         /** Flag to indicate end of asynchronous TX */
         volatile uint32_t irq_triggered;
+
+        /** Semaphore to wait for tx end*/
+        xSemaphoreHandle tx_end_event;
     } tx;
 
     /** Structure holding RX information */
@@ -99,6 +114,13 @@ static struct {
 
 void iotlab_serial_start(uint32_t baudrate)
 {
+    /* compatibility with HiKoB */
+    if (uart_external == NULL)
+        uart_external = uart_print;
+
+    uart_low_priority_interrupt_init(check_uart);
+    ser.tx.tx_end_event = xSemaphoreCreateCounting(1, 0);
+
     uart_enable(uart_external, baudrate);
     iotlab_packet_init_queue(&ser.rx.queue,
             ser.rx.packets, IOTLAB_SERIAL_NUM_RX_PKTS);
@@ -121,7 +143,11 @@ void iotlab_serial_start(uint32_t baudrate)
     // But be careful, the interrupt handler CANNOT use FreeRTOS or event functions
     // Therefore we use the platform IDLE handler to check for input
     uart_set_irq_priority(uart_external, 0x10);
-    platform_set_idle_handler(check_uart, NULL);
+    platform_set_idle_handler(idle_hook_uart, NULL);
+
+    xTaskCreate(iotlab_serial_tx_task, (signed char *)"serial_tx",
+            configMINIMAL_STACK_SIZE, NULL,
+            configMAX_PRIORITIES - 1, NULL);
 
     // allocate first packet
     allocate_rx_packet(NULL);
@@ -133,6 +159,44 @@ void iotlab_serial_register_handler(iotlab_serial_handler_t *handler)
     handler->next = ser.first_handler;
     ser.first_handler = handler;
 }
+
+iotlab_serial_handler_t *iotlab_serial_get_handler(uint8_t cmd_type)
+{
+    iotlab_serial_handler_t *handler = NULL;
+    for (handler = ser.first_handler;
+            handler != NULL;
+            handler = handler->next) {
+        if (handler->cmd_type == cmd_type)
+            break;
+    }
+    return handler;
+}
+
+int32_t iotlab_serial_call_handler(uint8_t cmd_type, iotlab_packet_t *packet)
+{
+    // Remove header
+    ((packet_t *)packet)->length -= IOTLAB_SERIAL_HEADER_SIZE;
+
+    iotlab_serial_handler_t *handler = iotlab_serial_get_handler(cmd_type);
+    if (handler)
+        return handler->handler(cmd_type, packet);
+    else
+        return 1;
+}
+
+void iotlab_serial_send_result(iotlab_packet_t *packet, uint8_t cmd_type,
+        int32_t result)
+{
+    packet->priority = IOTLAB_SERIAL_ANSWER_PRIORITY;
+    packet_t *pkt = (packet_t *)packet;
+
+    pkt->length = 1;
+    pkt->data[0] = ((0 == result) ? ACK : NACK);
+
+    iotlab_serial_send_frame(cmd_type, packet);
+}
+
+
 
 static int32_t iotlab_serial_init_tx_packet(uint8_t type,
         iotlab_packet_t *packet)
@@ -162,8 +226,6 @@ int32_t iotlab_serial_send_frame(uint8_t type, iotlab_packet_t *pkt)
         return ret;
 
     iotlab_packet_fifo_prio_append(&ser.tx.fifo, pkt);
-
-    send_now(NULL);
     return 0;
 }
 
@@ -248,29 +310,74 @@ static void char_rx(handler_arg_t arg, uint8_t c)
         // Switch buffers
         ser.rx.ready_pkt = ser.rx.rx_pkt;
         ser.rx.rx_pkt = NULL;
+
+        uart_low_priority_interrupt_trigger();
     }
 }
 
-static int32_t check_uart(handler_arg_t arg)
+
+static void packet_received(handler_arg_t arg)
 {
-    int32_t ret = 0;
+    if (ser.rx.ready_pkt == NULL)
+        return;
 
-    if (ser.rx.ready_pkt) {
-        event_post(EVENT_QUEUE_APPLI, packet_received, NULL);
-        ret = 1;
+    // Get the ready packet and prepare for next RX
+    iotlab_packet_t *rx_pkt = ser.rx.ready_pkt;
+    ser.rx.ready_pkt = NULL;
+
+    uint8_t cmd_type = ((packet_t *)rx_pkt)->raw_data[2];
+    int32_t result = iotlab_serial_call_handler(cmd_type, rx_pkt);
+
+    iotlab_serial_send_result(rx_pkt, cmd_type, result);
+}
+
+// Transmission
+
+static void iotlab_serial_tx_task(void *param)
+{
+    for (;;) {
+        iotlab_packet_t *packet;
+        packet = iotlab_packet_fifo_get(&ser.tx.fifo);  // Blocking
+        send_packet(packet);
+        iotlab_packet_call_free(packet);
     }
+}
 
-    if (ser.rx.rx_pkt == NULL) {
-        event_post(EVENT_QUEUE_APPLI, allocate_rx_packet, NULL);
-        ret = 1;
-    }
+static void send_packet(iotlab_packet_t *packet)
+{
+    packet_t *pkt = (packet_t *)packet;
 
-    if (ser.tx.irq_triggered) {
-        event_post(EVENT_QUEUE_APPLI, handle_packet_sent, NULL);
-        ret = 1;
-    }
+    packet->timestamp = soft_timer_time();
 
-    return ret;
+    uart_transfer_async(uart_external, pkt->raw_data, pkt->length,
+            tx_done_isr, NULL);
+    // Block until finished
+    xSemaphoreTake(ser.tx.tx_end_event, portMAX_DELAY);
+}
+
+
+/* Interrupts and idle_hook */
+
+/* normal priority to allow calling OS functions */
+static void uart_low_priority_interrupt_init(handler_t handler)
+{
+    nvic_enable_interrupt_line(NVIC_IOTLAB_SERIAL_IRQ_LINE);
+    nvic_set_priority(NVIC_IOTLAB_SERIAL_IRQ_LINE, 0xFE);
+    exti_set_handler(NVIC_IOTLAB_SERIAL_EXTI_LINE, handler, NULL);
+}
+
+static void uart_low_priority_interrupt_trigger()
+{
+    *cm3_nvic_get_STIR() = NVIC_IOTLAB_SERIAL_IRQ_LINE;
+}
+
+
+/* High priority, no OS functions allowed */
+
+static void tx_done_isr(handler_arg_t arg)
+{
+    ser.tx.irq_triggered = 1;
+    uart_low_priority_interrupt_trigger();
 }
 
 static void allocate_rx_packet(handler_arg_t arg)
@@ -280,100 +387,32 @@ static void allocate_rx_packet(handler_arg_t arg)
         ser.rx.rx_pkt = iotlab_serial_packet_alloc(&ser.rx.queue);
 }
 
-static void packet_received(handler_arg_t arg)
+static void check_uart(handler_arg_t arg)
 {
-    packet_t *rx_pkt;
-
-    // Allocate a new packet for RX
+    portBASE_TYPE yield;
     allocate_rx_packet(NULL);
 
-    // Get the ready packet
-    rx_pkt = (packet_t *)ser.rx.ready_pkt;
+    if (ser.rx.ready_pkt) {
+        event_post_from_isr(EVENT_QUEUE_APPLI, packet_received, NULL);
+    }
 
-    // Prepare packets for next RX
-    ser.rx.ready_pkt = NULL;
-
-    // Get the command type header
-    uint8_t cmd_type = rx_pkt->raw_data[2];
-
-    // Loop over the registered handlers to find a match
-    iotlab_serial_handler_t *handler = ser.first_handler;
-
-    int32_t result = 1;
-
-    // Remove header
-    rx_pkt->length -= IOTLAB_SERIAL_HEADER_SIZE;
-
-    while (handler != NULL) {
-        if (handler->cmd_type == cmd_type) {
-            // Found! process
-            result = handler->handler(cmd_type, (iotlab_packet_t *)rx_pkt);
-            break;
+    if (ser.tx.irq_triggered) {
+        ser.tx.irq_triggered = 0;
+        xSemaphoreGiveFromISR(ser.tx.tx_end_event, &yield);
+        if (yield) {
+            portYIELD();
         }
-        // Increment
-        handler = handler->next;
     }
-    if (NULL == handler)
-        result = 1;
-
-    rx_pkt->length = 1;
-    rx_pkt->data[0] = ((0 == result) ? ACK : NACK);
-
-    iotlab_serial_send_frame(cmd_type, (iotlab_packet_t *)rx_pkt);
-    // auto clean of packets
 }
 
-/* Start sending packets if lib was idle */
-static void send_now(handler_arg_t arg)
+// Idle hook may find cases where 'check_uart' failed to post from isr
+static int32_t idle_hook_uart(handler_arg_t arg)
 {
-    packet_t *pkt;
-    if (ser.tx.pkt)
-        return;  // Uart Send active, tx.fifo will be handled asyncronously
+    (void)arg;
 
-    // Try to get a frame from the FIFO
-    if (iotlab_packet_fifo_count(&ser.tx.fifo) == 0)
-        return;  // nothing to send
-
-    // Only one reader so it's safe, it won't block
-    ser.tx.pkt = iotlab_packet_fifo_get(&ser.tx.fifo);
-
-    pkt = (packet_t *)ser.tx.pkt;
-
-    // Tx start timestamp
-    ser.tx.pkt->timestamp = soft_timer_time();
-
-    // Start sending the packet
-#if ASYNCHRONOUS
-    uart_transfer_async(uart_external, pkt->raw_data, pkt->length,
-            tx_done_isr, NULL);
-#else // ASYNCHRONOUS
-    uart_transfer(uart_external, pkt->raw_data, pkt->length);
-    event_post(EVENT_QUEUE_APPLI, handle_packet_sent, NULL);
-#endif // ASYNCHRONOUS
-}
-
-#if ASYNCHRONOUS
-static void tx_done_isr(handler_arg_t arg)
-{
-    ser.tx.irq_triggered = 1;
-}
-#endif // ASYNCHRONOUS
-
-static void handle_packet_sent(handler_arg_t arg)
-{
-    // Check there is a packet being sent
-    if (ser.tx.pkt == NULL) {
-        leds_on(RED_LED);
-        log_error("Packet sent but no packet!");
-        return;
+    if (ser.rx.ready_pkt) {
+        uart_low_priority_interrupt_trigger();
+        return 1;
     }
-
-    // Free the packet
-    iotlab_packet_call_free(ser.tx.pkt);
-
-    // Clear the TX busy flag
-    ser.tx.pkt = NULL;
-    ser.tx.irq_triggered = 0;
-
-    send_now(NULL);
+    return 0;
 }

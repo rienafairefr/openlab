@@ -66,6 +66,7 @@ static inline volatile uint8_t *mem_get_reg8(uint32_t addr)
 #define CM3_NVIC_CLEAR_PENDING_OFFSET       0x180
 #define CM3_NVIC_ACTIVE_BIT_OFFSET          0x200
 #define CM3_NVIC_PRIORITY_OFFSET            0x300
+#define CM3_NVIC_STIR_OFFSET                0xE00
 
 /* CortexM3 SCB section */
 #define CM3_SCB_BASE_ADDRESS                0xE000ED00

@@ -94,6 +94,11 @@ DEBUG_HANDLER(dma2_ch4_5_isr);
 __attribute__((section(".usr_vectors"))) const vector_t usr_vectors[] =
 {
     // 0x40
+    /* The STM32F103xC, STM32F103xD and STM32F103xE performance line embeds a
+     * nested * vectored interrupt controller able to handle up to
+     * 60 maskable interrupt channels
+     * (not including the 16 interrupt lines of Cortex-M3)
+     */
     wwdg_isr, pvd_isr, tamper_stamp_isr, rtc_isr, flash_isr, rcc_isr,
     exti0_isr, exti1_isr, exti2_isr, exti3_isr, exti4_isr,
     dma1_channel1_isr, dma1_channel2_isr, dma1_channel3_isr,
