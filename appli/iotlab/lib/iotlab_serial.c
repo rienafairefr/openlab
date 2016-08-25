@@ -130,6 +130,43 @@ void iotlab_serial_register_handler(iotlab_serial_handler_t *handler)
     ser.first_handler = handler;
 }
 
+iotlab_serial_handler_t *iotlab_serial_get_handler(uint8_t cmd_type)
+{
+    iotlab_serial_handler_t *handler = NULL;
+    for (handler = ser.first_handler;
+            handler != NULL;
+            handler = handler->next) {
+        if (handler->cmd_type == cmd_type)
+            break;
+    }
+    return handler;
+}
+
+int32_t iotlab_serial_call_handler(uint8_t cmd_type, iotlab_packet_t *packet)
+{
+    // Remove header
+    ((packet_t *)packet)->length -= IOTLAB_SERIAL_HEADER_SIZE;
+
+    iotlab_serial_handler_t *handler = iotlab_serial_get_handler(cmd_type);
+    if (handler)
+        return handler->handler(cmd_type, packet);
+    else
+        return 1;
+}
+
+void iotlab_serial_send_result(iotlab_packet_t *packet, uint8_t cmd_type,
+        int32_t result)
+{
+    packet_t *pkt = (packet_t *)packet;
+
+    pkt->length = 1;
+    pkt->data[0] = ((0 == result) ? ACK : NACK);
+
+    iotlab_serial_send_frame(cmd_type, packet);
+}
+
+
+
 static int32_t iotlab_serial_init_tx_packet(uint8_t type,
         iotlab_packet_t *packet)
 {
@@ -278,45 +315,17 @@ static void allocate_rx_packet(handler_arg_t arg)
 
 static void packet_received(handler_arg_t arg)
 {
-    packet_t *rx_pkt;
-
     // Allocate a new packet for RX
     allocate_rx_packet(NULL);
 
-    // Get the ready packet
-    rx_pkt = (packet_t *)ser.rx.ready_pkt;
-
-    // Prepare packets for next RX
+    // Get the ready packet and prepare for next RX
+    iotlab_packet_t *rx_pkt = ser.rx.ready_pkt;
     ser.rx.ready_pkt = NULL;
 
-    // Get the command type header
-    uint8_t cmd_type = rx_pkt->raw_data[2];
+    uint8_t cmd_type = ((packet_t *)rx_pkt)->raw_data[2];
+    int32_t result = iotlab_serial_call_handler(cmd_type, rx_pkt);
 
-    // Loop over the registered handlers to find a match
-    iotlab_serial_handler_t *handler = ser.first_handler;
-
-    int32_t result = 1;
-
-    // Remove header
-    rx_pkt->length -= IOTLAB_SERIAL_HEADER_SIZE;
-
-    while (handler != NULL) {
-        if (handler->cmd_type == cmd_type) {
-            // Found! process
-            result = handler->handler(cmd_type, (iotlab_packet_t *)rx_pkt);
-            break;
-        }
-        // Increment
-        handler = handler->next;
-    }
-    if (NULL == handler)
-        result = 1;
-
-    rx_pkt->length = 1;
-    rx_pkt->data[0] = ((0 == result) ? ACK : NACK);
-
-    iotlab_serial_send_frame(cmd_type, (iotlab_packet_t *)rx_pkt);
-    // auto clean of packets
+    iotlab_serial_send_result(rx_pkt, cmd_type, result);
 }
 
 /* Start sending packets if lib was idle */
