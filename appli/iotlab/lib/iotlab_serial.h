@@ -47,9 +47,6 @@ enum {
 /** Start the serial library, at the specified baudrate */
 void iotlab_serial_start(uint32_t baudrate);
 
-/** Set the packet type for log packets */
-void iotlab_serial_set_logger_byte(uint8_t logger_type_byte);
-
 /**
  * The handler receives a packet with data contained in it, and should update
  * the same packet with the response.
