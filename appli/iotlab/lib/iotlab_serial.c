@@ -46,6 +46,7 @@ static void char_rx(handler_arg_t arg, uint8_t c);
 static void allocate_rx_packet(handler_arg_t arg);
 static void packet_received(handler_arg_t arg);
 static void send_now(handler_arg_t arg);
+static void send_packet(iotlab_packet_t *packet);
 
 /** Function called at the end of a UART TX transfer */
 static void tx_done_isr(handler_arg_t arg);
@@ -331,7 +332,6 @@ static void packet_received(handler_arg_t arg)
 /* Start sending packets if lib was idle */
 static void send_now(handler_arg_t arg)
 {
-    packet_t *pkt;
     if (ser.tx.pkt)
         return;  // Uart Send active, tx.fifo will be handled asyncronously
 
@@ -342,12 +342,15 @@ static void send_now(handler_arg_t arg)
     // Only one reader so it's safe, it won't block
     ser.tx.pkt = iotlab_packet_fifo_get(&ser.tx.fifo);
 
-    pkt = (packet_t *)ser.tx.pkt;
+    send_packet(ser.tx.pkt);
+}
 
-    // Tx start timestamp
-    ser.tx.pkt->timestamp = soft_timer_time();
+static void send_packet(iotlab_packet_t *packet)
+{
+    packet_t *pkt = (packet_t *)packet;
 
-    // Start sending the packet
+    packet->timestamp = soft_timer_time();
+
     uart_transfer_async(uart_external, pkt->raw_data, pkt->length,
             tx_done_isr, NULL);
 }
