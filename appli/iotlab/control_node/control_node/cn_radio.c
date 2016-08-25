@@ -40,8 +40,16 @@ enum {
 #define MEASURES_PRIORITY 0
 #define CN_RADIO_NUM_PKTS (8)
 
+typedef enum radio_mode {
+    RADIO_OFF = 0,
+    RADIO_POLLING,
+    RADIO_SNIFFER,
+} radio_mode_t;
+
 static struct
 {
+    radio_mode_t mode;
+
     soft_timer_t timer;
 
     uint32_t channels;
@@ -75,6 +83,7 @@ static struct
     } jam;
 #endif
 } radio = {
+    .mode = RADIO_OFF,
     .sniff = {
         .pkt_index = 0,
         .pkt_buf = {
@@ -181,6 +190,7 @@ static int32_t radio_off(uint8_t cmd_type, iotlab_packet_t *packet)
 {
     (void)packet;
     // Stop all
+    radio.mode = RADIO_OFF;
     proper_stop();
     return 0;
 }
@@ -228,6 +238,7 @@ static int32_t radio_polling(uint8_t cmd_type, iotlab_packet_t *packet)
     /*
      * Now config radio
      */
+    radio.mode = RADIO_POLLING;
 
     // Stop previous and reset config
     proper_stop();
@@ -248,6 +259,9 @@ static void poll_time(handler_arg_t arg)
     struct soft_timer_timeval timestamp;
     iotlab_packet_t *packet;
     uint8_t channel = (uint8_t) radio.current_channel;
+
+    if (radio.mode != RADIO_POLLING)
+        return;
 
     phy_ed(platform_phy, &ed);
     iotlab_time_extend_relative(&timestamp, soft_timer_time());
@@ -323,6 +337,7 @@ static int32_t radio_sniffer(uint8_t cmd_type, iotlab_packet_t *packet)
     /*
      * Now config radio
      */
+    radio.mode = RADIO_SNIFFER;
 
     // Stop previous and reset config
     proper_stop();
@@ -365,6 +380,9 @@ static void zep_to_packet(packet_t *pkt, phy_packet_t *rx_pkt, uint8_t channel)
 
 static void sniff_handle_rx_appli_queue(handler_arg_t arg)
 {
+    if (radio.mode != RADIO_SNIFFER)
+        return;
+
     phy_status_t status = (phy_status_t)arg;
 
     // Get current packet and switch packets
