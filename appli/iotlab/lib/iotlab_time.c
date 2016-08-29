@@ -1,3 +1,4 @@
+#include <string.h>
 #include "soft_timer_delay.h"
 #include "iotlab_time.h"
 
@@ -15,19 +16,41 @@ struct iotlab_time_config {
     uint64_t time0;
     struct soft_timer_timeval unix_time_ref;
     uint32_t kfrequency;  // 1000 * frequency to get more precisions with int
+    uint64_t last_set_time;
 };
 
-static struct iotlab_time_config time_config[1] = {{0, {0, 0}, SOFT_TIMER_KFREQUENCY_FIX}};
+/* Number of previous config saved */
+#define NUM_SAVED_CONFIG (1)
+/* Sorted from latest to oldest */
+static struct iotlab_time_config time_config[1 + NUM_SAVED_CONFIG] = {
+    [0 ... NUM_SAVED_CONFIG] =
+    {0, {0, 0}, SOFT_TIMER_KFREQUENCY_FIX, 0}};
 
 
 void iotlab_time_set_time(uint32_t t0, struct soft_timer_timeval *time_ref)
 {
+    memmove(time_config + 1, time_config, NUM_SAVED_CONFIG * sizeof(struct iotlab_time_config));
+
     uint64_t now64 = soft_timer_time_64();
     uint64_t time0 = get_extended_time(t0, now64);
 
     time_config[0].time0 = time0;
     time_config[0].unix_time_ref = *time_ref;
     time_config[0].kfrequency = SOFT_TIMER_KFREQUENCY_FIX;
+    time_config[0].last_set_time = now64;
+}
+
+static struct iotlab_time_config *select_config(uint64_t timer_tick_64)
+{
+    uint64_t last_set_time = time_config[0].last_set_time;
+
+    if (timer_tick_64 < last_set_time)
+        return &time_config[1];
+    /* If the timer_tick_64 is equal to the last set time, we use previous config */
+    else if (timer_tick_64 == last_set_time)
+        return &time_config[1];
+    else
+        return &time_config[0];
 }
 
 static void _iotlab_time_convert(struct iotlab_time_config *config, struct soft_timer_timeval *time, uint64_t timer_tick_64)
@@ -51,7 +74,7 @@ static void _iotlab_time_convert(struct iotlab_time_config *config, struct soft_
 
 static void iotlab_time_convert(struct soft_timer_timeval *time, uint64_t timer_tick_64)
 {
-    struct iotlab_time_config *config = &time_config[0];
+    struct iotlab_time_config *config = select_config(timer_tick_64);
     _iotlab_time_convert(config, time, timer_tick_64);
 }
 
