@@ -10,8 +10,8 @@ static inline void ticks_conversion(struct soft_timer_timeval* time,
 static uint64_t get_extended_time(uint32_t timer_tick, uint64_t timer_tick_64);
 
 
-uint64_t time0 = 0;
-struct soft_timer_timeval unix_time_ref = {0, 0};
+static uint64_t time0 = 0;
+static struct soft_timer_timeval unix_time_ref = {0, 0};
 
 void iotlab_time_set_time(uint32_t t0, struct soft_timer_timeval *time_ref)
 {

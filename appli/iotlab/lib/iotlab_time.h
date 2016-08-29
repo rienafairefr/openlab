@@ -1,9 +1,6 @@
 #ifndef IOTLAB_TIME_H
 #define IOTLAB_TIME_H
 
-extern uint64_t time0;
-extern struct soft_timer_timeval unix_time_ref;
-
 /*
  * Sets t0 as 64b reference in time0 and
  * save time_ref in unix_time_ref
