@@ -105,18 +105,16 @@ uint32_t soft_timer_time()
 struct soft_timer_timeval soft_timer_time_extended()
 {
     struct soft_timer_timeval tv;
-    vPortEnterCritical();
+    struct _soft_timer_time t = _soft_timer_time();
 
-    tv.tv_sec = softtim.update_count << 1;
-    uint32_t t = soft_timer_time();
-
-    vPortExitCritical();
-
-    tv.tv_sec += (t & 0x8000) ? 1 : 0;
-    tv.tv_usec = soft_timer_ticks_to_us(t & 0x7FFF);
+    tv.tv_sec = t.update_count << 1;
+    tv.tv_sec += (t.time16 & 0x8000) ? 1 : 0;
+    tv.tv_usec = soft_timer_ticks_to_us(t.time16 & 0x7FFF);
 
     return tv;
 }
+
+
 uint32_t soft_timer_convert_time(uint16_t t)
 {
     // We assume t cannot be in the future
