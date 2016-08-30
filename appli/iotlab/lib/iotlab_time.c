@@ -14,9 +14,10 @@ static uint64_t get_extended_time(uint32_t timer_tick, uint64_t timer_tick_64);
 struct iotlab_time_config {
     uint64_t time0;
     struct soft_timer_timeval unix_time_ref;
+    uint32_t kfrequency;  // 1000 * frequency to get more precisions with int
 };
 
-static struct iotlab_time_config time_config[1] = {{0, {0, 0}}};
+static struct iotlab_time_config time_config[1] = {{0, {0, 0}, SOFT_TIMER_KFREQUENCY_FIX}};
 
 
 void iotlab_time_set_time(uint32_t t0, struct soft_timer_timeval *time_ref)
@@ -26,6 +27,7 @@ void iotlab_time_set_time(uint32_t t0, struct soft_timer_timeval *time_ref)
 
     time_config[0].time0 = time0;
     time_config[0].unix_time_ref = *time_ref;
+    time_config[0].kfrequency = SOFT_TIMER_KFREQUENCY_FIX;
 }
 
 static void _iotlab_time_convert(struct iotlab_time_config *config, struct soft_timer_timeval *time, uint64_t timer_tick_64)
@@ -34,7 +36,7 @@ static void _iotlab_time_convert(struct iotlab_time_config *config, struct soft_
      * Frequency scaling should only be used to convert the ticks
      *       between 'time0' and 'timer_tick_64'.
      */
-    ticks_conversion(time, timer_tick_64 - config->time0, SOFT_TIMER_KFREQUENCY_FIX);
+    ticks_conversion(time, timer_tick_64 - config->time0, config->kfrequency);
 
     /* Add unix time */
     time->tv_sec  += config->unix_time_ref.tv_sec;
