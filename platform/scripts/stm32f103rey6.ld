@@ -81,7 +81,11 @@ SECTIONS
 		. = ALIGN(4);
 		__init_array_start = .;
 		KEEP (*(SORT(.init_array.*)))
+
+		__init_array = .;
 		KEEP (*(.init_array))
+		__init_array_e = .;
+
 		__init_array_end = .;
 		
 		. = ALIGN(4);
