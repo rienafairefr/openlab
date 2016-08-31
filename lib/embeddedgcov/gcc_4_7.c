@@ -13,7 +13,7 @@
 
 #include "gcov.h"
 #include <stdlib.h>
-#include <memory.h>
+#include <string.h>
 
 #if __GNUC__ == 4 && __GNUC_MINOR__ >= 9
 #define GCOV_COUNTERS 9
@@ -116,16 +116,13 @@ const char *gcov_info_filename(struct gcov_info *info)
  * file. Returns the number of bytes stored. If @buffer is %NULL, doesn't
  * store anything.
  */
-static size_t store_gcov_u32(void *buffer, size_t off, u32 v)
+static size_t store_gcov_u32(char *buffer, size_t off, u32 v)
 {
-    u32 *data;
-
     if (buffer) {
-        data = buffer + off;
-        *data = v;
+        memcpy(buffer + off, &v, sizeof(u32));
     }
 
-    return sizeof(*data);
+    return sizeof(u32);
 }
 
 /**
@@ -140,18 +137,17 @@ static size_t store_gcov_u32(void *buffer, size_t off, u32 v)
  * first. Returns the number of bytes stored. If @buffer is %NULL, doesn't store
  * anything.
  */
-static size_t store_gcov_u64(void *buffer, size_t off, u64 v)
+static size_t store_gcov_u64(char *buffer, size_t off, u64 v)
 {
-    u32 *data;
-
+    u32 v32;
     if (buffer) {
-        data = buffer + off;
-
-        data[0] = (v & 0xffffffffUL);
-        data[1] = (v >> 32);
+        v32 = (v & 0xffffffffUL);
+        memcpy(buffer + off, &v32, sizeof(u32));
+        v32 = (v >> 32);
+        memcpy(buffer + off + sizeof(u32), &v32, sizeof(u32));
     }
 
-    return sizeof(*data) * 2;
+    return sizeof(u64);
 }
 
 /**
