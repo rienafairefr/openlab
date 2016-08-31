@@ -34,8 +34,6 @@
 #ifndef GCOV_H
 #define GCOV_H GCOV_H
 
-#include <stdio.h>
-
 #include "gcov_public.h"
 
 /*
