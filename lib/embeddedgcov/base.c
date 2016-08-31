@@ -33,10 +33,12 @@
  *             Paul Larson
  */
 
+#include <stdlib.h>
+#include <string.h>
+
+#include "debug.h"
 #include "gcov_.h"
 #include "gcov.h"
-#include <stdio.h>
-#include <stdlib.h>
 
 #include "embeddedgcov.h"
 
@@ -74,13 +76,12 @@ int embeddedgcov_init()
  */
 void __gcov_init(struct gcov_info *info)
 {
-    printf(
-        "__gcov_init called for %s!\n",
+    log_debug(
+        "__gcov_init called for %s!",
         gcov_info_filename(info));
-    fflush(stdout);
     GcovInfo *newHead = malloc(sizeof(GcovInfo));
     if (!newHead) {
-        puts("Out of memory!");
+        log_error("Out of memory!");
         exit(1);
     }
     newHead->info = info;
@@ -104,7 +105,7 @@ static void __gcov_exit(struct gcov_info *info)
     unsigned bytesNeeded = convert_to_gcda(NULL, info);
     buffer = malloc(bytesNeeded);
     if (!buffer) {
-        puts("Out of memory!");
+        log_error("Out of memory!");
         exit(1);
     }
     convert_to_gcda(buffer, info);
@@ -114,7 +115,6 @@ static void __gcov_exit(struct gcov_info *info)
 
 void __gcov_merge_add(gcov_type *counters, unsigned int n_counters)
 {
-    puts("__gcov_merge_add isn't called, right? Right? RIGHT?");
-    fflush(stdout);
+    log_error("__gcov_merge_add isn't called, right? Right? RIGHT?");
     exit(1);
 }
