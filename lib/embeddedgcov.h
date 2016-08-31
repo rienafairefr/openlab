@@ -14,6 +14,15 @@ struct gcov_info;
     struct gcov_info *embeddedgcov_array[size];
 
 
+/** EMBEDDEDGCOV_BUFFER create embeddedgcov gcda buffer.
+ * Overrides default 'weak' declaration
+ * \param size  size of array should be greater than biggest gcda file.
+ */
+#define EMBEDDEDGCOV_BUFFER(size) \
+    size_t embeddedgcov_buffer_size = (size); \
+    char   embeddedgcov_buffer[size];
+
+
 int embeddedgcov_init();
 void embeddedgcov_exit();
 
