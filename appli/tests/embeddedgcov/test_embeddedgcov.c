@@ -6,6 +6,7 @@
 
 #include "max_int.h"
 
+EMBEDDEDGCOV_ARRAY(2);
 
 #define ASSERT(exp)\
     do {\
