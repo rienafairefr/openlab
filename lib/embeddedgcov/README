@@ -1,0 +1,17 @@
+Coverage code
+
+Inspired, copied, stolen, adapted from
+
+    https://www.thanassis.space/coverage.html
+
+
+http://ltp.sourceforge.net/documentation/technical_papers/gcov-ols2003.pdf
+http://sysrun.haifa.il.ibm.com/hrl/greps2007/papers/gcov-on-an-embedded-system.pdf
+
+https://mcuoneclipse.com/2014/12/26/code-coverage-for-embedded-target-with-eclipse-gcc-and-gcov/
+
+http://stackoverflow.com/questions/6343348/global-constructor-call-not-in-init-array-section
+
+http://reverseengineering.stackexchange.com/questions/6285/how-to-recover-information-stored-in-ctors-section
+
+http://stackoverflow.com/questions/36839354/generating-gcda-coverage-files-via-qemu-gdb
