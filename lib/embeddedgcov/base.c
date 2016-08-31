@@ -33,16 +33,40 @@
  *             Paul Larson
  */
 
-#include "gcov_public.h"
+#include "gcov_.h"
 #include "gcov.h"
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "embeddedgcov.h"
+
+/* Ignore compiler warning for these */
+void __attribute__((weak)) _init() {}
+void __attribute__((weak)) _fini() {}
+
+extern void (*__init_array)(void);
+extern void (*__init_array_e)(void);
+
+
+typedef void (*init_fct_t)(void);
 
 typedef struct tagGcovInfo {
     struct gcov_info *info;
     struct tagGcovInfo *next;
 } GcovInfo;
 GcovInfo *headGcov = NULL;
+
+
+int embeddedgcov_init()
+{
+    /* Call all init functions */
+    init_fct_t *init_fct = NULL;
+    for (init_fct = &__init_array; init_fct < &__init_array_e; init_fct++) {
+        (*init_fct)();
+    }
+    return 0;
+}
+
 
 /*
  * __gcov_init is called by gcc-generated constructor code for each object
@@ -64,22 +88,28 @@ void __gcov_init(struct gcov_info *info)
     headGcov = newHead;
 }
 
-void __gcov_exit()
+static void __gcov_exit(struct gcov_info *info);
+void embeddedgcov_exit()
 {
     GcovInfo *tmp = headGcov;
-    while(tmp) {
-        char *buffer;
-        unsigned bytesNeeded = convert_to_gcda(NULL, tmp->info);
-        buffer = malloc(bytesNeeded);
-        if (!buffer) {
-            puts("Out of memory!");
-            exit(1);
-        }
-        convert_to_gcda(buffer, tmp->info);
-        printf("Emitting %6d bytes for %s\n", bytesNeeded, gcov_info_filename(tmp->info));
-        free(buffer);
+    while (tmp) {
+        __gcov_exit(tmp->info);
         tmp = tmp->next;
     }
+}
+
+static void __gcov_exit(struct gcov_info *info)
+{
+    char *buffer;
+    unsigned bytesNeeded = convert_to_gcda(NULL, info);
+    buffer = malloc(bytesNeeded);
+    if (!buffer) {
+        puts("Out of memory!");
+        exit(1);
+    }
+    convert_to_gcda(buffer, info);
+    printf("Emitting %6d bytes for %s\n", bytesNeeded, gcov_info_filename(info));
+    free(buffer);
 }
 
 void __gcov_merge_add(gcov_type *counters, unsigned int n_counters)

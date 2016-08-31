@@ -34,7 +34,7 @@
 #ifndef GCOV_H
 #define GCOV_H GCOV_H
 
-#include "gcov_public.h"
+#include "gcov_.h"
 
 /*
  * Profiling data types used for gcc 3.4 and above - these are defined by

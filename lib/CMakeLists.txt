@@ -57,5 +57,6 @@ target_link_libraries(packet freertos)
 
 add_subdirectory(oml)
 
-
 add_library(shell STATIC shell/shell)
+
+add_library(embeddedgcov STATIC embeddedgcov/base embeddedgcov/gcc_4_7)
