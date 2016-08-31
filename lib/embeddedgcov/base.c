@@ -52,23 +52,34 @@ extern void (*__init_array_e)(void);
 
 typedef void (*init_fct_t)(void);
 
-typedef struct tagGcovInfo {
-    struct gcov_info *info;
-    struct tagGcovInfo *next;
-} GcovInfo;
-GcovInfo *headGcov = NULL;
+#ifndef GCOV_ARRAY_SIZE
+#define GCOV_ARRAY_SIZE (8)
+#endif//GCOV_ARRAY_SIZE
 
+/*
+ * Weak default values
+ */
+/* Gcov struct pointer array */
+size_t           __attribute__((weak))  embeddedgcov_array_size = GCOV_ARRAY_SIZE;
+struct gcov_info __attribute__((weak)) *embeddedgcov_array[GCOV_ARRAY_SIZE];
+
+static size_t gcov_cur_index = 0;
+static size_t gcov_max_index = 0;
 
 int embeddedgcov_init()
 {
+    /* Reset array */
+    gcov_max_index = 0;
+    gcov_cur_index = 0;
+
     /* Call all init functions */
     init_fct_t *init_fct = NULL;
     for (init_fct = &__init_array; init_fct < &__init_array_e; init_fct++) {
         (*init_fct)();
     }
-    return 0;
-}
 
+    return gcov_max_index;
+}
 
 /*
  * __gcov_init is called by gcc-generated constructor code for each object
@@ -76,26 +87,23 @@ int embeddedgcov_init()
  */
 void __gcov_init(struct gcov_info *info)
 {
-    log_debug(
-        "__gcov_init called for %s!",
-        gcov_info_filename(info));
-    GcovInfo *newHead = malloc(sizeof(GcovInfo));
-    if (!newHead) {
-        log_error("Out of memory!");
-        exit(1);
+    size_t index = gcov_cur_index++;
+
+
+    log_debug("__gcov_init called for %s", gcov_info_filename(info));
+    if (index < embeddedgcov_array_size) {
+        embeddedgcov_array[index] = info;
+        gcov_max_index++;
+        return;
     }
-    newHead->info = info;
-    newHead->next = headGcov;
-    headGcov = newHead;
 }
 
 static void __gcov_exit(struct gcov_info *info);
 void embeddedgcov_exit()
 {
-    GcovInfo *tmp = headGcov;
-    while (tmp) {
-        __gcov_exit(tmp->info);
-        tmp = tmp->next;
+    int i;
+    for (i = 0; i < gcov_max_index; i++) {
+        __gcov_exit(embeddedgcov_array[i]);
     }
 }
 
