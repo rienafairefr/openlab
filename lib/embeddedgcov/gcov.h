@@ -9,7 +9,7 @@
  * if something goes wrong.
  *
  * Thanassis Tsiodras
- * Real-time Embedded Software Engineer 
+ * Real-time Embedded Software Engineer
  * System, Software and Technology Department
  * European Space Agency
  *
@@ -43,11 +43,11 @@
  * gcc and need to be kept as close to the original definition as possible to
  * remain compatible.
  */
-#define GCOV_DATA_MAGIC		((unsigned int) 0x67636461)
-#define GCOV_TAG_FUNCTION	((unsigned int) 0x01000000)
-#define GCOV_TAG_COUNTER_BASE	((unsigned int) 0x01a10000)
-#define GCOV_TAG_FOR_COUNTER(count)					\
-	(GCOV_TAG_COUNTER_BASE + ((unsigned int) (count) << 17))
+#define GCOV_DATA_MAGIC          ((unsigned int) 0x67636461)
+#define GCOV_TAG_FUNCTION        ((unsigned int) 0x01000000)
+#define GCOV_TAG_COUNTER_BASE    ((unsigned int) 0x01a10000)
+#define GCOV_TAG_FOR_COUNTER(count) \
+    (GCOV_TAG_COUNTER_BASE + ((unsigned int) (count) << 17))
 
 /* Opaque gcov_info. The gcov structures can change as for example in gcc 4.7 so
  * we cannot use full definition here and they need to be placed in gcc specific
@@ -64,8 +64,8 @@ void gcov_info_unlink(struct gcov_info *prev, struct gcov_info *info);
 
 /* Base interface. */
 enum gcov_action {
-	GCOV_ADD,
-	GCOV_REMOVE,
+    GCOV_ADD,
+    GCOV_REMOVE,
 };
 
 void gcov_event(enum gcov_action action, struct gcov_info *info);
@@ -89,11 +89,11 @@ void gcov_info_add(struct gcov_info *dest, struct gcov_info *source);
 void gcov_info_free(struct gcov_info *info);
 
 struct gcov_link {
-	enum {
-		OBJ_TREE,
-		SRC_TREE,
-	} dir;
-	const char *ext;
+    enum {
+        OBJ_TREE,
+        SRC_TREE,
+    } dir;
+    const char *ext;
 };
 extern const struct gcov_link gcov_link[];
 

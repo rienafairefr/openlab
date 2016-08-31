@@ -16,12 +16,12 @@
 #include <memory.h>
 
 #if __GNUC__ == 4 && __GNUC_MINOR__ >= 9
-#define GCOV_COUNTERS			9
+#define GCOV_COUNTERS 9
 #else
-#define GCOV_COUNTERS			8
+#define GCOV_COUNTERS 8
 #endif
 
-#define GCOV_TAG_FUNCTION_LENGTH	3
+#define GCOV_TAG_FUNCTION_LENGTH 3
 
 typedef unsigned int u32;
 typedef unsigned long long u64;
@@ -36,8 +36,8 @@ typedef unsigned long long u64;
  * at run-time with the exception of the values array.
  */
 struct gcov_ctr_info {
-	unsigned int num;
-	gcov_type *values;
+    unsigned int num;
+    gcov_type *values;
 };
 
 /**
@@ -58,11 +58,11 @@ struct gcov_ctr_info {
  * of the object file containing the selected comdat function.
  */
 struct gcov_fn_info {
-	const struct gcov_info *key;
-	unsigned int ident;
-	unsigned int lineno_checksum;
-	unsigned int cfg_checksum;
-	struct gcov_ctr_info ctrs[0];
+    const struct gcov_info *key;
+    unsigned int ident;
+    unsigned int lineno_checksum;
+    unsigned int cfg_checksum;
+    struct gcov_ctr_info ctrs[0];
 };
 
 /**
@@ -79,13 +79,13 @@ struct gcov_fn_info {
  * at run-time with the exception of the next pointer.
  */
 struct gcov_info {
-	unsigned int version;
-	struct gcov_info *next;
-	unsigned int stamp;
-	const char *filename;
-	void (*merge[GCOV_COUNTERS])(gcov_type *, unsigned int);
-	unsigned int n_functions;
-	struct gcov_fn_info **functions;
+    unsigned int version;
+    struct gcov_info *next;
+    unsigned int stamp;
+    const char *filename;
+    void (*merge[GCOV_COUNTERS])(gcov_type *, unsigned int);
+    unsigned int n_functions;
+    struct gcov_fn_info **functions;
 };
 
 /*
@@ -93,7 +93,7 @@ struct gcov_info {
  */
 static int counter_active(struct gcov_info *info, unsigned int type)
 {
-	return info->merge[type] ? 1 : 0;
+    return info->merge[type] ? 1 : 0;
 }
 
 /**
@@ -102,7 +102,7 @@ static int counter_active(struct gcov_info *info, unsigned int type)
  */
 const char *gcov_info_filename(struct gcov_info *info)
 {
-	return info->filename;
+    return info->filename;
 }
 
 /**
@@ -118,14 +118,14 @@ const char *gcov_info_filename(struct gcov_info *info)
  */
 static size_t store_gcov_u32(void *buffer, size_t off, u32 v)
 {
-	u32 *data;
+    u32 *data;
 
-	if (buffer) {
-		data = buffer + off;
-		*data = v;
-	}
+    if (buffer) {
+        data = buffer + off;
+        *data = v;
+    }
 
-	return sizeof(*data);
+    return sizeof(*data);
 }
 
 /**
@@ -142,16 +142,16 @@ static size_t store_gcov_u32(void *buffer, size_t off, u32 v)
  */
 static size_t store_gcov_u64(void *buffer, size_t off, u64 v)
 {
-	u32 *data;
+    u32 *data;
 
-	if (buffer) {
-		data = buffer + off;
+    if (buffer) {
+        data = buffer + off;
 
-		data[0] = (v & 0xffffffffUL);
-		data[1] = (v >> 32);
-	}
+        data[0] = (v & 0xffffffffUL);
+        data[1] = (v >> 32);
+    }
 
-	return sizeof(*data) * 2;
+    return sizeof(*data) * 2;
 }
 
 /**
@@ -163,47 +163,47 @@ static size_t store_gcov_u64(void *buffer, size_t off, u64 v)
  */
 size_t convert_to_gcda(char *buffer, struct gcov_info *info)
 {
-	struct gcov_fn_info *fi_ptr;
-	struct gcov_ctr_info *ci_ptr;
-	unsigned int fi_idx;
-	unsigned int ct_idx;
-	unsigned int cv_idx;
-	size_t pos = 0;
+    struct gcov_fn_info *fi_ptr;
+    struct gcov_ctr_info *ci_ptr;
+    unsigned int fi_idx;
+    unsigned int ct_idx;
+    unsigned int cv_idx;
+    size_t pos = 0;
 
-	/* File header. */
-	pos += store_gcov_u32(buffer, pos, GCOV_DATA_MAGIC);
-	pos += store_gcov_u32(buffer, pos, info->version);
-	pos += store_gcov_u32(buffer, pos, info->stamp);
+    /* File header. */
+    pos += store_gcov_u32(buffer, pos, GCOV_DATA_MAGIC);
+    pos += store_gcov_u32(buffer, pos, info->version);
+    pos += store_gcov_u32(buffer, pos, info->stamp);
 
-	for (fi_idx = 0; fi_idx < info->n_functions; fi_idx++) {
-		fi_ptr = info->functions[fi_idx];
+    for (fi_idx = 0; fi_idx < info->n_functions; fi_idx++) {
+        fi_ptr = info->functions[fi_idx];
 
-		/* Function record. */
-		pos += store_gcov_u32(buffer, pos, GCOV_TAG_FUNCTION);
-		pos += store_gcov_u32(buffer, pos, GCOV_TAG_FUNCTION_LENGTH);
-		pos += store_gcov_u32(buffer, pos, fi_ptr->ident);
-		pos += store_gcov_u32(buffer, pos, fi_ptr->lineno_checksum);
-		pos += store_gcov_u32(buffer, pos, fi_ptr->cfg_checksum);
+        /* Function record. */
+        pos += store_gcov_u32(buffer, pos, GCOV_TAG_FUNCTION);
+        pos += store_gcov_u32(buffer, pos, GCOV_TAG_FUNCTION_LENGTH);
+        pos += store_gcov_u32(buffer, pos, fi_ptr->ident);
+        pos += store_gcov_u32(buffer, pos, fi_ptr->lineno_checksum);
+        pos += store_gcov_u32(buffer, pos, fi_ptr->cfg_checksum);
 
-		ci_ptr = fi_ptr->ctrs;
+        ci_ptr = fi_ptr->ctrs;
 
-		for (ct_idx = 0; ct_idx < GCOV_COUNTERS; ct_idx++) {
-			if (!counter_active(info, ct_idx))
-				continue;
+        for (ct_idx = 0; ct_idx < GCOV_COUNTERS; ct_idx++) {
+            if (!counter_active(info, ct_idx))
+                continue;
 
-			/* Counter record. */
-			pos += store_gcov_u32(buffer, pos,
-					      GCOV_TAG_FOR_COUNTER(ct_idx));
-			pos += store_gcov_u32(buffer, pos, ci_ptr->num * 2);
+            /* Counter record. */
+            pos += store_gcov_u32(buffer, pos,
+                    GCOV_TAG_FOR_COUNTER(ct_idx));
+            pos += store_gcov_u32(buffer, pos, ci_ptr->num * 2);
 
-			for (cv_idx = 0; cv_idx < ci_ptr->num; cv_idx++) {
-				pos += store_gcov_u64(buffer, pos,
-						      ci_ptr->values[cv_idx]);
-			}
+            for (cv_idx = 0; cv_idx < ci_ptr->num; cv_idx++) {
+                pos += store_gcov_u64(buffer, pos,
+                        ci_ptr->values[cv_idx]);
+            }
 
-			ci_ptr++;
-		}
-	}
+            ci_ptr++;
+        }
+    }
 
-	return pos;
+    return pos;
 }

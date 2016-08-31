@@ -9,7 +9,7 @@
  * if something goes wrong.
  *
  * Thanassis Tsiodras
- * Real-time Embedded Software Engineer 
+ * Real-time Embedded Software Engineer
  * System, Software and Technology Department
  * European Space Agency
  *
@@ -26,11 +26,11 @@
  *
  *    Uses gcc-internal data definitions.
  *    Based on the gcov-kernel patch by:
- *		 Hubertus Franke <frankeh@us.ibm.com>
- *		 Nigel Hinds <nhinds@us.ibm.com>
- *		 Rajan Ravindran <rajancr@us.ibm.com>
- *		 Peter Oberparleiter <oberpar@linux.vnet.ibm.com>
- *		 Paul Larson
+ *             Hubertus Franke <frankeh@us.ibm.com>
+ *             Nigel Hinds <nhinds@us.ibm.com>
+ *             Rajan Ravindran <rajancr@us.ibm.com>
+ *             Peter Oberparleiter <oberpar@linux.vnet.ibm.com>
+ *             Paul Larson
  */
 
 #include "gcov_public.h"
@@ -51,7 +51,7 @@ GcovInfo *headGcov = NULL;
 void __gcov_init(struct gcov_info *info)
 {
     printf(
-        "__gcov_init called for %s!\n", 
+        "__gcov_init called for %s!\n",
         gcov_info_filename(info));
     fflush(stdout);
     GcovInfo *newHead = malloc(sizeof(GcovInfo));
