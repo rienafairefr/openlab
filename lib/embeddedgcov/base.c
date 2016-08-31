@@ -37,6 +37,7 @@
 #include <string.h>
 
 #include "debug.h"
+#include "platform.h"
 #include "gcov_.h"
 #include "gcov.h"
 
@@ -130,8 +131,12 @@ void embeddedgcov_exit()
 
 void embeddedgcov_export_gcda(const char *filename, char *buffer, size_t size)
 {
-    (void)buffer;
-    printf("Emitting %6d bytes for %s\n", gcda_size, filename);
+    printf("<GCDA>\n");
+    printf("%d\n", size);
+    printf("%s\n", filename);
+    uart_transfer(uart_print, (const uint8_t *)buffer, size);
+    printf("\n");
+    printf("</GCDA>\n");
 }
 
 static void __gcov_exit(struct gcov_info *info)
