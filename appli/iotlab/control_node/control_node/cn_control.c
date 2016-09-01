@@ -14,6 +14,9 @@
 #include "cn_radio.h"
 #include "cn_event.h"
 
+/* for saving clock configuration */
+#include "cn_clock_config.h"
+
 #define CN_CONTROL_NUM_ACKS (2)
 
 static struct {
@@ -106,6 +109,7 @@ static int32_t set_time(uint8_t cmd_type, iotlab_packet_t *packet)
 
 static void do_set_time(handler_arg_t arg)
 {
+    struct iotlab_time_config config;
     iotlab_packet_t *ack_pkt = (iotlab_packet_t *)arg;
 
     /*
@@ -124,6 +128,9 @@ static void do_set_time(handler_arg_t arg)
     }
 
     iotlab_time_set_time(set_time_aux.t0, &set_time_aux.unix_time);
+    iotlab_time_get_config(&config);
+
+    cn_clock_handler(&config);
 }
 
 
