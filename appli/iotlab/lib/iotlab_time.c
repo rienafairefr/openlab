@@ -14,12 +14,6 @@ static inline void ticks_conversion(struct soft_timer_timeval* time,
 static uint64_t get_extended_time(uint32_t timer_tick, uint64_t timer_tick_64);
 static uint32_t _iotlab_time_adjusted_kfrequency();
 
-struct iotlab_time_config {
-    uint64_t time0;
-    struct soft_timer_timeval unix_time_ref;
-    uint32_t kfrequency;  // 1000 * frequency to get more precisions with int
-    uint64_t last_set_time;
-};
 
 /* Number of previous config saved */
 #define NUM_SAVED_CONFIG (1)
@@ -31,6 +25,10 @@ static struct iotlab_time_config time_config[1 + NUM_SAVED_CONFIG] = {
 /* Select if frequency should be adapted dynamically. Makes testing easier. */
 static int adapt_frequency = 1;
 
+void iotlab_time_get_config(struct iotlab_time_config *config)
+{
+    *config = time_config[0];
+}
 
 void iotlab_time_set_time(uint32_t t0, struct soft_timer_timeval *time_ref)
 {
