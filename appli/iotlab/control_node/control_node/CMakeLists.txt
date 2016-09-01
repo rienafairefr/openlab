@@ -24,6 +24,7 @@ if(${PLATFORM_HAS_INA226})
         cn_autotest
         cn_logger
         cn_event
+        cn_clock_config
         )
     target_link_libraries(control_node
         platform
@@ -48,6 +49,7 @@ if (PLATFORM STREQUAL "iotlab-m3")
         cn_radio
         cn_logger
         cn_event
+        cn_clock_config
         )
 target_link_libraries(control_node_m3
         platform
