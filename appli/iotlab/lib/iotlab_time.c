@@ -1,41 +1,69 @@
+#include <string.h>
 #include "soft_timer_delay.h"
 #include "iotlab_time.h"
 
+// 1000 real soft timer frequency
+//     72000000. / (72000000 / 32768) == 32771.96176604461
+#define SOFT_TIMER_KFREQUENCY_FIX 32771798
 
-static inline uint32_t get_microseconds(uint32_t timer_tick);
-static inline uint32_t get_seconds(uint32_t timer_tick);
-static void get_absolute_time(struct soft_timer_timeval *absolute_time,
-        uint32_t timer_tick, uint32_t timer_secs);
+static inline uint32_t get_microseconds(uint64_t timer_tick, uint32_t kfrequency);
+static inline uint32_t get_seconds(uint64_t timer_tick, uint32_t kfrequency);
+static inline void ticks_conversion(struct soft_timer_timeval* time,
+        uint64_t timer_tick, uint32_t kfrequency);
+static uint64_t get_extended_time(uint32_t timer_tick, uint64_t timer_tick_64);
+
+struct iotlab_time_config {
+    uint64_t time0;
+    struct soft_timer_timeval unix_time_ref;
+    uint32_t kfrequency;  // 1000 * frequency to get more precisions with int
+    uint64_t last_set_time;
+};
+
+/* Number of previous config saved */
+#define NUM_SAVED_CONFIG (1)
+/* Sorted from latest to oldest */
+static struct iotlab_time_config time_config[1 + NUM_SAVED_CONFIG] = {
+    [0 ... NUM_SAVED_CONFIG] =
+    {0, {0, 0}, SOFT_TIMER_KFREQUENCY_FIX, 0}};
 
 
-struct soft_timer_timeval time0 = {0, 0};
-struct soft_timer_timeval unix_time_ref = {0, 0};
-
-void iotlab_time_set_time(struct soft_timer_timeval *t0,
-        struct soft_timer_timeval *time_ref)
+void iotlab_time_set_time(uint32_t t0, struct soft_timer_timeval *time_ref)
 {
-    time0 = *t0;
-    unix_time_ref = *time_ref;
+    memmove(time_config + 1, time_config, NUM_SAVED_CONFIG * sizeof(struct iotlab_time_config));
+
+    uint64_t now64 = soft_timer_time_64();
+    uint64_t time0 = get_extended_time(t0, now64);
+
+    time_config[0].time0 = time0;
+    time_config[0].unix_time_ref = *time_ref;
+    time_config[0].kfrequency = SOFT_TIMER_KFREQUENCY_FIX;
+    time_config[0].last_set_time = now64;
 }
 
-void iotlab_time_extend_relative(struct soft_timer_timeval *time,
-        uint32_t timer_tick)
+static struct iotlab_time_config *select_config(uint64_t timer_tick_64)
 {
-    /* extend timer_tick to timeval */
-    *time = soft_timer_time_extended();
-    get_absolute_time(time, timer_tick, time->tv_sec);
+    uint64_t last_set_time = time_config[0].last_set_time;
 
-    /* Set time relative to time0 */
-    time->tv_sec -= time0.tv_sec;
-    if (time->tv_usec < time0.tv_usec) {
-        time->tv_usec += 1000000;
-        time->tv_sec  -= 1;
-    }
-    time->tv_usec -= time0.tv_usec;
+    if (timer_tick_64 < last_set_time)
+        return &time_config[1];
+    /* If the timer_tick_64 is equal to the last set time, we use previous config */
+    else if (timer_tick_64 == last_set_time)
+        return &time_config[1];
+    else
+        return &time_config[0];
+}
+
+static void _iotlab_time_convert(struct iotlab_time_config *config, struct soft_timer_timeval *time, uint64_t timer_tick_64)
+{
+    /*
+     * Frequency scaling should only be used to convert the ticks
+     *       between 'time0' and 'timer_tick_64'.
+     */
+    ticks_conversion(time, timer_tick_64 - config->time0, config->kfrequency);
 
     /* Add unix time */
-    time->tv_sec  += unix_time_ref.tv_sec;
-    time->tv_usec += unix_time_ref.tv_usec;
+    time->tv_sec  += config->unix_time_ref.tv_sec;
+    time->tv_usec += config->unix_time_ref.tv_usec;
 
     /* Correct usecs > 100000 */
     if (time->tv_usec > 1000000) {
@@ -44,83 +72,58 @@ void iotlab_time_extend_relative(struct soft_timer_timeval *time,
     }
 }
 
+static void iotlab_time_convert(struct soft_timer_timeval *time, uint64_t timer_tick_64)
+{
+    struct iotlab_time_config *config = select_config(timer_tick_64);
+    _iotlab_time_convert(config, time, timer_tick_64);
+}
+
+void iotlab_time_extend_relative(struct soft_timer_timeval *time,
+        uint32_t timer_tick)
+{
+    uint64_t now64 = soft_timer_time_64();
+    uint64_t timer_tick_64 = get_extended_time(timer_tick, now64);
+
+    iotlab_time_convert(time, timer_tick_64);
+}
+
 
 
 /*
- * Get the absolute time using a 'ticks' timer, and a 'seconds' timer
- *
- * The 'seconds' timer should be have a value taken after the 'ticks' timer.
- * The function supports timer_secs to be taken 0xF seconds after measuring timer_tick.
- *
+ * Extend to 64bit a past 32 bits 'ticks' timer using current 64 ticks timer.
  */
-static void get_absolute_time(struct soft_timer_timeval *absolute_time,
-        uint32_t timer_tick, uint32_t timer_secs)
+static uint64_t get_extended_time(uint32_t timer_tick, uint64_t timer_tick_64)
 {
-    uint32_t seconds_s     = timer_secs;
-    uint32_t seconds_ticks = get_seconds(timer_tick);
+    // Get the big part from the 64 bit timer, and the small from the 32 bit timer.
+    uint64_t absolute_time = (timer_tick_64 & (~0xFFFFFFFFull)) | timer_tick;
 
-    uint32_t final_secs;
-
-
-    /*
-     *
-     * Get the small variations from the timer_ticks calculation of seconds
-     * And the big part of the value from the timer_seconds
-     *
-     * In the case where the fact that timer_seconds is taken later,
-     * makes its 4 LSB bytes "overflow", 0x10 should be removed
-     * It's detected comparing the 5th LSB of both timers calculation of seconds.
-     *
-     * Example:
-     * seconds_ticks = 0x0F0A
-     * seconds_s = 0x0F0C (taken 2 seconds later)
-     * final_secs = 0x0F00 | 0x000A == 0x0F00A
-     * final_secs -= 0  // everything fine
-     * final_secs == 0x0F0A == seconds_ticks (which is right for small values)
-     *
-     * seconds_ticks = 0x0FFE
-     * seconds_s = 0x1000 (taken 2 seconds later) // here, 0x10 seconds should be removed
-     * final_secs = 0x1000 | 0x000E == 0x100E
-     * final_secs -= 0x10
-     * final_secs = 0x0FFE == seconds_ticks (whics is what is expected for small values)
-     *
-     */
-
-    // Works because 2**32 is a multiple of 32768
-    // Get the big part from the seconds, and the small from the ticks.
-    final_secs = (seconds_s & (~ 0xF)) | (seconds_ticks & (0xF));
     // remove the 'overflow' if necessary
-    final_secs -= (seconds_s & (0x10)) ^ (seconds_ticks & (0x10));
+    if ((timer_tick_64 & 0x80000000) < (timer_tick & 0x80000000))
+        absolute_time -= 0x100000000;
 
-    absolute_time->tv_sec = final_secs;
-    absolute_time->tv_usec = get_microseconds(timer_tick);
+    return absolute_time;
 }
 
-
-
-static inline uint32_t get_seconds(uint32_t timer_tick)
+static inline void ticks_conversion(struct soft_timer_timeval* time, uint64_t timer_tick, uint32_t kfrequency)
 {
-    return timer_tick / SOFT_TIMER_FREQUENCY;
+    time->tv_sec = get_seconds(timer_tick, kfrequency);
+    time->tv_usec = get_microseconds(timer_tick, kfrequency);
 }
 
-static inline uint32_t get_microseconds(uint32_t timer_tick)
+static inline uint32_t get_seconds(uint64_t timer_tick, uint32_t kfrequency)
 {
-    /*
-     * 2^6 is Greatest Common Divisor of one million and 32768,
-     * and (32768 * 1000000 / GCD) <= 2**32 -1
-     */
+    timer_tick *= 1000;  // Use 1000 * ticks as using 1000 * frequency
 
-    uint32_t aux_32;
-    aux_32  = (timer_tick % SOFT_TIMER_FREQUENCY);
-    aux_32 *= (1000000 / (1 << 6));
-    aux_32 /= (SOFT_TIMER_FREQUENCY / (1 << 6));
-    return aux_32;
-
-    /* normal calculation with a 64b
-     * uint64_t aux;
-     * aux  = (timer_tick % SOFT_TIMER_FREQUENCY;
-     * aux *= 1000000; // convert to useconds before dividing to keep as integer
-     * aux /= SOFT_TIMER_FREQUENCY;
-     */
+    return timer_tick / kfrequency;
 }
 
+static inline uint32_t get_microseconds(uint64_t timer_tick, uint32_t kfrequency)
+{
+    timer_tick *= 1000;  // Use 1000 * ticks as using 1000 * frequency
+
+    uint64_t aux64;
+    aux64 = (timer_tick % kfrequency);
+    aux64 *= 1000000;  // convert to useconds before dividing to keep as integer
+    aux64 /= kfrequency;
+    return (uint32_t)aux64;
+}

@@ -75,7 +75,7 @@ void cn_control_start()
 
 static struct {
         struct soft_timer_timeval unix_time;
-        struct soft_timer_timeval t0;
+        uint32_t t0;
 } set_time_aux;
 
 
@@ -85,8 +85,7 @@ static int32_t set_time(uint8_t cmd_type, iotlab_packet_t *packet)
     if (8 != pkt->length)
         return 1;
     /* Save time as soon as possible */
-    // TODO: Use time in packet later
-    set_time_aux.t0 = soft_timer_time_extended();
+    set_time_aux.t0 = packet->timestamp;
     /* copy unix time from pkt */
     memcpy(&set_time_aux.unix_time, pkt->data, pkt->length);
 
@@ -124,7 +123,7 @@ static void do_set_time(handler_arg_t arg)
         return;
     }
 
-    iotlab_time_set_time(&set_time_aux.t0, &set_time_aux.unix_time);
+    iotlab_time_set_time(set_time_aux.t0, &set_time_aux.unix_time);
 }
 
 
