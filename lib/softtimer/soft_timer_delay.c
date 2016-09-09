@@ -51,7 +51,13 @@ void soft_timer_config(openlab_timer_t timer, timer_channel_t channel)
     softtim.update_count = 0;
 }
 
-uint32_t soft_timer_time()
+struct _soft_timer_time {
+    uint32_t update_count;
+    uint16_t time16;
+};
+
+
+static struct _soft_timer_time _soft_timer_time()
 {
     /*
      * To prevent having the remainder being incremented while computing,
@@ -69,13 +75,14 @@ uint32_t soft_timer_time()
      *
      *
      */
+    uint32_t update_count = 0;
     uint16_t t_a, t_b;
-    uint32_t t, update = 0;
+    uint32_t update = 0;
 
     // Mask interrupts
     vPortEnterCritical();
 
-    t = softtim.update_count << 16;
+    update_count = softtim.update_count;
     t_a = timer_time(softtim.timer);
     update = timer_get_update_flag(softtim.timer);
     t_b = timer_time(softtim.timer);
@@ -83,25 +90,37 @@ uint32_t soft_timer_time()
     // Unmask interrupts
     vPortExitCritical();
 
-    // Compute result as the base time plus the measured time, plus an update
-    return t + ((update || (t_b < t_a)) ? 0x10000 : 0) + t_b;
+    // Add one if missed update
+    update_count += ((update || (t_b < t_a)) ? 1 : 0);
+
+    return (struct _soft_timer_time){update_count, t_b};
+}
+
+uint32_t soft_timer_time()
+{
+    struct _soft_timer_time t = _soft_timer_time();
+    return (t.update_count << 16) + t.time16;
+}
+
+uint64_t soft_timer_time_64()
+{
+    struct _soft_timer_time t = _soft_timer_time();
+    return (((uint64_t)t.update_count) << 16) + t.time16;
 }
 
 struct soft_timer_timeval soft_timer_time_extended()
 {
     struct soft_timer_timeval tv;
-    vPortEnterCritical();
+    struct _soft_timer_time t = _soft_timer_time();
 
-    tv.tv_sec = softtim.update_count << 1;
-    uint32_t t = soft_timer_time();
-
-    vPortExitCritical();
-
-    tv.tv_sec += (t & 0x8000) ? 1 : 0;
-    tv.tv_usec = soft_timer_ticks_to_us(t & 0x7FFF);
+    tv.tv_sec = t.update_count << 1;
+    tv.tv_sec += (t.time16 & 0x8000) ? 1 : 0;
+    tv.tv_usec = soft_timer_ticks_to_us(t.time16 & 0x7FFF);
 
     return tv;
 }
+
+
 uint32_t soft_timer_convert_time(uint16_t t)
 {
     // We assume t cannot be in the future
