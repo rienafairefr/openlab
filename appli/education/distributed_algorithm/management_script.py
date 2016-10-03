@@ -22,7 +22,7 @@ def opts_parser():
 
     algo_group = parser.add_argument_group(title="Algorithm selection")
 
-    algo_group.add_argument('-a', '--algo', default='syncronous',
+    algo_group.add_argument('-a', '--algo', default='synchronous',
                             choices=ALGOS.keys(), help='Algorithm to run')
     _parser.num_loop(algo_group, required=False)
     _parser.neighbours_graph(algo_group, required=False)
@@ -257,7 +257,7 @@ ALGOS = {
     'print_graph': (_algos.print_graph, 'write_neighbours'),
     'load_graph': (_algos.load_graph, 'nop'),
 
-    'syncronous': (_algos.syncronous, 'write_results'),
+    'synchronous': (_algos.synchronous, 'write_results'),
 
     'gossip': (_algos.gossip, 'write_results_lambda_timestamp'),
     'num_nodes': (_algos.num_nodes_gossip, 'write_results_lambda_timestamp'),
@@ -272,12 +272,12 @@ def parse():
     parser = opts_parser()
     opts = parser.parse_args()
 
-    if (opts.algo in ['load_graph', 'syncronous', 'gossip', 'num_nodes',
+    if (opts.algo in ['load_graph', 'synchronous', 'gossip', 'num_nodes',
                       'clock_convergence'] and
             opts.neighbours is None):
         parser.error('neighbours not provided')
-    if (opts.algo in ['syncronous', 'gossip', 'num_nodes', 'print_poisson'] and
-            opts.num_loop is None):
+    if (opts.algo in ['synchronous', 'gossip', 'num_nodes', 'print_poisson']
+            and opts.num_loop is None):
         parser.error('num_loop not provided')
     if opts.algo in ['clock_convergence'] and opts.duration is None:
         parser.error('duration not provided')

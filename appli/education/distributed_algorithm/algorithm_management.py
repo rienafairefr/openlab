@@ -87,8 +87,8 @@ def print_poisson(aggregator, lambda_t=5, num_loop=300, **_):
 
 
 @with_neighbours_graph
-def syncronous(aggregator, num_loop=0, **_):
-    """ Run messages sending and all in syncronous mode """
+def synchronous(aggregator, num_loop=0, **_):
+    """ Run messages sending and all in synchronous mode """
     broadcast_slow(aggregator, 'print-values', 0)
 
     for _ in range(0, num_loop):
@@ -99,7 +99,7 @@ def syncronous(aggregator, num_loop=0, **_):
 
 @with_neighbours_graph
 def gossip(aggregator, num_loop=0, **_):
-    """ Run messages sending and all in syncronous mode """
+    """ Run messages sending and all in gossip mode """
     broadcast_slow(aggregator, 'print-values', 0)
 
     for _ in range(0, num_loop):
