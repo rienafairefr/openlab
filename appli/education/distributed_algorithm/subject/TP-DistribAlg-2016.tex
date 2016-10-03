@@ -26,8 +26,8 @@ Distributed Algorithms and Network Systems\\[-2mm]
 
 \section{About this lab and the report}
 In this lab, you will put in practice some distributed algorithms seen in class.
-You will use the experimental platform FIT/IoT-lab (\url{https://www.iot-lab.info}).
-What is it? Read the answer here: \url{https://www.iot-lab.info/what-is-iot-lab/}.\\
+You will use the experimental platform FIT/IoT-lab (\url{https://www.iot-lab.info})
+to execute your algorithms on real microcontrollers communicating through radio.\\
 
 You are required to write a report, which will be graded.\\ Send it by e-mail to \texttt{federica.garin@inria.fr}.\\
 Deadline: Wednesday, Nov.~30th.\\
@@ -48,9 +48,13 @@ Recommendations for a good report:
 \textit{\color{blue} This preliminary task is not meant to be described in your report. Just write a very short introduction (few lines!), stating the goal of this lab and mentioning the use of FIT/IoT-lab}\\
 
 
-To familiarize yourself with the use of the platform, go to the page of tutorials:
+To familiarize yourself with the use of the platform:
+\begin{itemize}
+\item Read the testbed presentation at: \url{https://www.iot-lab.info/what-is-iot-lab/}
+\end{itemize}
+
+Then go to the page of tutorials and the following four tutorials (First steps):
 \begin{center} \url{https://www.iot-lab.info/tutorials/} \end{center}
-and do the following four tutorials (First steps):
 \begin{itemize}
 \item Configure your SSH access;
 \item Submit an experiment with Web portal: M3 nodes;
@@ -58,14 +62,18 @@ and do the following four tutorials (First steps):
 \item Tools$\to$Node-cli client (Update firmware from command line)
 \end{itemize}
 
-\subsection{Provided files}
+\section{Provided files}
 
 %For this lab, you are given
 %an already-written firmware that allows you to interact with the nodes, and which has two modes, either synchronous or gossip.
 %In synchronous mode, there is a global notion of discrete-time iterations: at each iteration, all communications take place, then all local computations are done.
 %In gossip mode, at each iteration a random node is selected to send its state; all neighbors having received such message immediately proceed to do a local computation and update local state.
 For this lab, you are given
-an already-written firmware that allows you to interact with the nodes, either in synchronous or gossip mode. You will start by using the synchronous mode, where  there is a global notion of discrete-time iterations: at each iteration, all communications take place, then all local computations are done.
+an already-written firmware that allows you to interact with the nodes,
+either in synchronous or gossip mode.
+You will start by using the synchronous mode,
+where there is a global notion of discrete-time iterations: at each iteration,
+all communications take place, then all local computations are done.
 
 %In gossip mode (more precisely, this is a broadcast gossip), each node has a local Poisson clock; when a node is activated by its Poisson clock, it sends its state to its neighbors; all neighbors having received such message immediately proceed to do a local computation and update local state.
 
@@ -74,19 +82,27 @@ There are python scripts already written for you; the thing you will need to do
 is to open some C file and modify it, so as to write the suitable functions for
 the required computations.
 
-\subsection{Accesing files on the server}
+\subsection{Accessing files on the server}
+
+To simplify usage compared to what you did in the tutorial, a symbolic link has been
+created in your home directory on the server \verb=~/distributed_algorithm=.
+And everything can be done from this this directory.\\
+
 
 You should:
 \begin{itemize}
 \item Follow the instructions in the tutorial to configure your ssh access
-\item Open a  terminal, do \verb=ssh=, to arrive at \verb=<username>@grenoble:~= \\
-and then change directory:\\
-\verb=cd ~/iot-lab/parts/openlab/appli/education/distributed_algorithm= \\
-This is where the files are sitting, that can be modified by you.\\
+\item Open a terminal, use \verb=ssh= to connect to your account and \\
+    use \verb=cd= to change to \verb=distributed_algorithm= directory:
+    \begin{verbatim}your_computer:$ ssh miscitXX@grenoble.iot-lab.info
+miscitXX@grenoble:~$ cd ~/distributed_algorithm
+miscitXX@grenoble:~/distributed_algorithm$
+\end{verbatim}
+This is where the files are sitting, that can be modified by you.
 
-Use \verb=ls= to see which files are there. The ones you need are the following:
+\item Use \verb=ls= to see which files are there. The ones you need are the following:
 	\begin{itemize}
-	\item Mainly, you will need to modify \verb=computing.c= and \verb=clock_convergence.c= to add the functions for computing (more details below)
+	\item You will need to modify \verb=computing.c= and \verb=clock_convergence.c= to add the functions for computing (more details below)
 	\item In the file \verb=config.h=, you will need to modify:
 		\begin{itemize}
 %        \item The number of values (i.e., how many scalars there are in the state
@@ -101,41 +117,62 @@ Use \verb=ls= to see which files are there. The ones you need are the following:
 		\item Possibly, you might  need to modify another thing in this file:
             the power reception threshold \verb=MIN_RSSI= in case the graph is
             too sparse (disconnected) or too dense (too many communications, not
-            an interesting example of distributed computing). This signal
-            strength is in dB, and there is a minus sign before the value,
+            an interesting example of distributed computing).\\
+            This signal strength is in dB, and there is a minus sign before the value,
             so putting a higher value means decreasing strength.
          \item Some parameters of the local system clocks (to be used in the clock-synchronization exercice): \verb=TIME_SCALE=, \verb=TIME_SCALE_RANDOM=, and \verb=TIME_OFFSET_RANDOM=.
 		\end{itemize}
+    \item A \verb=subject= directory with \LaTeX~sources of the subject.
+    \item A \verb=results= directory to put all exercices intermediate results.
 	\end{itemize}
+\end{itemize}
+
 You can open and modify the files directly on the server, without downloading
 them to your local computer, just use \verb=nano <filename>.c= to open a file in
 a text editor (to save the file after having modified it, follow instructions to
 quit and then you will be prompted with the question where you wish to save it
 (\verb=Ctrl+x= and \verb='O'=))
 
-\item About the functions in \verb=computing.c= (you will use this file for synchronous consensus and for broadcast-gossip consensus)
-	\begin{itemize}
+
+\subsection{Source file function description}
+
+
+\subsubsection{Consensus: computing.c}
+
+You will use \verb=computing.c= file for synchronous and broadcast-gossip consensuses.
+The following function are of your interest:
+
+\begin{itemize}
 	\item  \verb=init_value()= does random initialization; this is for a scalar value.
 %        It is called multiple times if \verb=NUM_VALUES=$\ge 2$ (remember,
 %        this parameter is set in the file \verb=config.h=)
-	\item \verb=compute_value_from_neighbours= has to be used only in the synchronous mode.
+	\item \verb=compute_value_from_neighbours= has to be used only in the synchronous mode.\\
         It allows a node to compute its new state given: its own old state (\verb=my_value=),
         its own degree (\verb=my_degree=), and a structure received from neighbors,
-        containing their state and degree. Notice: if you are able to add the
+        containing their state and degree.\\
+        Notice: if you are able to add the
         contribution of each neighbor incrementally, you can use the
         already-written code to parse the structure of received values, so that
         you do not need to worry about that: at iteration $i$, which concerns
         the neighbor $i$, \verb=neighbour_degree= is the degree of $i$ and
         \verb=neighbour_value= is the value (the state) of $i$.
         % Also notice: when there is more than one state per node (\verb=NUM_VALUES=$\ge 2$), this function is called many times, one per each state (it operates on a scalar state, not vector).
-	\item \verb=compute_value_from_gossip= has to be used only in gossip mode, for consensus. It allows a node to compute its new state, given its old state and the received state (received from a neighbor having done the gossip broadcast transmission).
+	\item \verb=compute_value_from_gossip= has to be used only in gossip mode, for consensus.\\
+        It allows a node to compute its new state, given its old state and the received state
+        (received from a neighbor having done the gossip broadcast transmission).
 %	\item \verb=compute_final_value= is needed when computing the estimated number of nodes, after the gossip max-consensus algorithm
-	\end{itemize}
-\item About the functions in \verb=clock_convergence.c= (you will use this file for clock synchronization):
-	\begin{itemize}
-	\item \verb=clock_convergence_virtual_time= computes the current virtual time of a node (using the local variables $k_{\text{up}}$, $t_{\text{virt},\text{up}}$ and $t_{\text{sys},\text{up}}$)
-	\item \verb=clock_convergence_update_time= uses the received neighbor virtual time  to compute the updates of the local variables  $k_{\text{up}}$, $t_{\text{virt},\text{up}}$ and $t_{\text{sys},\text{up}}$. In this function you need to suitably choose parameters $\alpha$ and $q$.
-	\end{itemize}
+\end{itemize}
+
+You will use \verb=clock_convergence.c= for clock synchronization exercices.
+The following function are of your interest:
+
+\begin{itemize}
+	\item \verb=clock_convergence_virtual_time= computes the current virtual time of a node
+        (using the local variables $k_{\text{up}}$, $t_{\text{virt},\text{up}}$ and $t_{\text{sys},\text{up}}$)
+	\item \verb=clock_convergence_update_time= uses the received neighbor virtual time
+        to compute the updates of the local variables
+        $k_{\text{up}}$, $t_{\text{virt},\text{up}}$ and $t_{\text{sys},\text{up}}$.
+        In this function you need to suitably choose parameters $\alpha$ and $q$.
 \end{itemize}
 
 \subsection{Running experiments for the exercices}
@@ -155,21 +192,38 @@ experiment and click on \textbf{Reload}. This will ensure you are using the
 same nodes. If you use different nodes you will have to re-generate the network
 graph on new experiments (explained later).
 
-\subsubsection{Commands to compile and flash}
+\subsubsection{Commands to edit, compile and flash}
+
+Everything is done in the \verb=~/distributed_algorithm= directory:
+\begin{verbatim}
+miscitXX@grenoble:~$ cd ~/distributed_algorithm
+miscitXX@grenoble:~/distributed_algorithm$
+\end{verbatim}
+
+All following command will be run on the server and lines will begin with\\
+\verb=miscitXX@grenoble:~/distributed_algorithm$= that I will only note with
+\verb=~/distributed_algorithm$=.
+
 
 \begin{itemize}
 
-\item Compile: every time you want to compile, from the directory\\
-    \verb=<username>@grenoble:~/iot-lab/parts/openlab/build.m3$=\\
-    simply type \verb=make distributed_algorithm=
+\item Edit file: use \verb=nano= (or vim if you know what you are doing)
+    \begin{verbatim}~/distributed_algorithm$ nano <filename>.c\end{verbatim}
+    And exit with \verb=Ctrl+x= and \verb='O'= and \verb=Enter= to save.
 
-    \begin{verbatim}cd ~/iot-lab/parts/openlab/build.m3
-make distributed_algorithm\end{verbatim}
+\item Compile: every time you want to compile, simply type \verb=make=.\\
+    (It will run the compilation from \verb=build.m3= directory as you did in the tutorial and copy the result firmware.)
+    \begin{verbatim}~/distributed_algorithm$ make
+make -C ../../../build.m3 distributed_algorithm
+  ...
+‘../../../build.m3/bin/distributed_algorithm.elf’ -> ‘distributed_algorithm.elf’
+\end{verbatim}
 
 \item After having compiled, you need to flash your executable file to all nodes.
-    To do so, from the same directory run:
-    \begin{verbatim}cd ~/iot-lab/parts/openlab/build.m3
-node-cli --update bin/distributed_algorithm.elf\end{verbatim}
+    \begin{verbatim}~/distributed_algorithm$ node-cli --update distributed_algorithm.elf
+# This takes a few seconds
+\end{verbatim}
+
 \end{itemize}
 
 \subsubsection{Generating communication graph}
@@ -180,11 +234,12 @@ reused across experiments.
 
 \paragraph{On the server}
 
-\begin{verbatim}cd ~/iot-lab/parts/openlab/appli/education/distributed_algorithm/
-# Generate graph
-./network_graph_create.py  -o ~/communication_graph
+Run from the \verb=distrubuted_algorithm= directory.
 
-ls ~/communication_graph
+\begin{verbatim}# Generates graph in results/communication_graph/
+~/distributed_algorithm$ ./network_graph_create.py -o results/communication_graph/
+
+~/distributed_algorithm$ ls results/communication_graph
 graph.dot  graph.png  neighbours.csv \end{verbatim}
 
 It generates two important files:
@@ -192,44 +247,85 @@ It generates two important files:
 \texttt{graph.png} which is the graphical representation for visualization.
 
 \paragraph{On your computer} Download graph and visualize it:
-\begin{verbatim}scp -r <username>@grenoble.iot-lab.info:~/communication_graph/ ./
-eog ~/communication_graph/graph.png\end{verbatim}
+\begin{verbatim}your_computer:~$ scp -Cr miscitXX@grenoble.iot-lab.info:~/distributed_algorithm/ ./
+eog distributed_algorithm/results/communication_graph/graph.png\end{verbatim}
+
+\textbf{Warning:} This command overwrites overwrites what you may have written
+in your local \verb=distributed_algorithm= directory. So don't modify files in there.\\
 
 If your graph is not connected or too dense you may want to generate another one.
 First change the \verb=config.h -> MIN_RSSI= value. Decreasing the value
 increases connectivity. Then compile, flash and re-run the graph generation.
 
-
-
 \subsection{Running experiments for the exercices}
 
 Run your experiment: in a terminal where you are at \\
-\verb=<username>@grenoble:~/iot-lab/parts/openlab/appli/education/distributed_algorithm/= \\
-type:\\
- \verb=./algo_XXXX.py --num-loop 50 -g ~/communication_graph/neighbours.csv --outdir ~/ex_1/= \\
+\verb=miscitXX@grenoble:~/distributed_algorithm$= \\
+type:
+\begin{verbatim}
+./algo_XXXX.py --num-loop 50 -g results/communication_graph/neighbours.csv \
+    --outdir results/ex_1/
+\end{verbatim}
 
-    Use the correct script according to the current algorithm by replacing
-    \verb=algo_XXXX.py= as follows:\\
-\verb=algo_syncronous.py= (for synchronous consensus),
-\verb=algo_gossip.py= (for broadcast gossip consensus), and
-\verb=algo_clock_convergence.py= (for clock synchronization). \\
-	For all three scripts, the option \verb=-g= gives the communication graph to use for the algorithm, and the option \verb=--outdir= describes the folder for the results files.\\
-	Moreover, for \verb=algo_syncronous.py= and \verb=algo_gossip.py=, the option \verb=--num-loop= gives the number of iterations, while for \verb=algo_clock_convergence.py=, \verb=--lambda= is the intensity of the local Poisson clocks and \verb=--duration= gives the duration of the experiment (in seconds).
-
-
-Download the results: open another terminal, on which you are not going to do ssh, just stay on your home. Type \\
-         \verb=scp -r <username>@grenoble.iot-lab.info:~/ex_1/ ./=\\
-where \verb=ex_1=  needs to be replaced by the suitable name you had chosen for your results folder while launching the experiment.
-
-\paragraph{}The results files are the following.
+Use the correct script according to the algorithm by replacing
+\verb=algo_XXXX.py= as follows:
 \begin{itemize}
-\item For synchronous consensus (\verb=algo_syncronous.py=):
+    \item \verb=algo_synchronous.py= for synchronous consensus,
+    \item \verb=algo_gossip.py= for broadcast gossip consensus and
+    \item \verb=algo_clock_convergence.py= (for clock synchronization).
+\end{itemize}
+
+\subsubsection{Scripts options}
+
+For all three scripts, the option \verb=-g= gives the communication graph to use for the algorithm,
+and the option \verb=--outdir= describes the folder for the results files.\\
+
+Moreover,
+\begin{itemize}
+    \item for \verb=algo_synchronous.py= and \verb=algo_gossip.py=:\\
+        \verb=--num-loop= option gives the number of iterations,
+    \item while for \verb=algo_clock_convergence.py=:\\
+        \verb=--lambda= is the intensity of the local Poisson clocks and\\
+        \verb=--duration= gives the duration of the experiment (in seconds).
+\end{itemize}
+
+\textbf{Warning:} For every exercise, remember to \textbf{increment} the number for \verb=--outdir results/ex_NUM=
+or it could permanently overwrite the previous results making them non-recoverable.\\
+
+You can try the default code with \verb=algo_synchronous.py= a \verb=--num-loop= of $10$ and
+\verb=--outdir= to a directory named \verb=ex_0_test=.
+
+
+\subsection{Download the results}
+
+To download the results, open another terminal, on which you are not going to do ssh, just stay on your home directory.
+Type the following command to download the whole project directory:
+\begin{verbatim}
+your_computer:~$ scp -Cr miscitXX@grenoble.iot-lab.info:distributed_algorithm/ ./
+\end{verbatim}
+
+Your local \verb=~/distributed_algorithm= directory will match the server files hierarchy.
+The results for exercice number \verb=NUM= will then be in \verb=distributed_algorithm/results/ex_NUM=.
+
+\subsubsection{Results files}
+
+The results files and format are the following.
+
+\begin{itemize}
+\item For synchronous consensus (\verb=algo_synchronous.py=):
 a file \verb=results_all.csv=, with a first column with the node label, then a column with the iteration number (from 1 to the value chosen with option \verb=--num-loop=), and a column with the value of the state of this node at this iteration.
 \item For broadcast-gossip consensus (\verb=algo_gossip.py=):
 a file \verb=results_all.csv=, with the same three columns as above, plus a fourth column with the timestamp corresponding to the iteration (since with the Poisson clock, iterations happen at random times, not equi-spaced).
 \item For clock synchronization (\verb=algo_clock_convergence.py=):
 a file \verb=clock_all.csv=, with a first column with the node label, a second column with the timestamp (server time, i.e., absolute time, which is unknown to the nodes but useful for us for analysis purposes), then a third column whith the local system time, and a fourth column with the local virtual time.
 \end{itemize}
+If you tested the default source code, you can see the result in \verb=distributed_algorithm/results/ex_0_test/results_all.csv=.
+In this case, a simple maximum is calculated.
+
+
+\newpage
+
+\newpage
 
 \section{Synchronous consensus}
 You are given a setup where communications are synchronized (at each iteration,
