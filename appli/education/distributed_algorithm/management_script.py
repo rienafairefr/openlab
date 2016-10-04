@@ -4,54 +4,61 @@
 """ Get the iotlab-uip for all experiment nodes """
 
 import sys
+import os
 import time
 import subprocess
+import random
+import math
 
 from iotlabaggregator import serial
-from iotlabcli.parser import common as common_parser
 
-import algorithm_management
+import algorithm_management as _algos
+import parser as _parser
 
 
 def opts_parser():
     """ Argument parser object """
-    import argparse
-    parser = argparse.ArgumentParser()
-    common_parser.add_auth_arguments(parser)
+    parser = _parser.base_parser()
 
-    nodes_group = parser.add_argument_group(
-        description="By default, select currently running experiment nodes",
-        title="Nodes selection")
+    algo_group = parser.add_argument_group(title="Algorithm selection")
 
-    nodes_group.add_argument('-i', '--id', dest='experiment_id', type=int,
-                             help='experiment id submission')
+    algo_group.add_argument('-a', '--algo', default='synchronous',
+                            choices=ALGOS.keys(), help='Algorithm to run')
+    _parser.num_loop(algo_group, required=False)
+    _parser.neighbours_graph(algo_group, required=False)
+    _parser.txpower(algo_group)
 
-    nodes_group.add_argument(
-        '-l', '--list', type=common_parser.nodes_list_from_str,
-        dest='nodes_list', help='nodes list, may be given multiple times')
-
-    nodes_group.add_argument('-a', '--algo', default='syncronous',
-                             choices=ALGOS.keys(), help='Algorithm to run')
-
-    nodes_group.add_argument(
-        '-n', '--num-loop', type=int, required=True,
-        dest='num_loop', help='number_of_loops_to_run')
-
-    nodes_group.add_argument(
-        '-o', '--out-file', required=True,
-        dest='outfile', help='Files where to output traces')
+    # For poisson algorithms
+    _parser.lambda_t(algo_group, required=False)
+    _parser.duration(algo_group, required=False)
 
     return parser
 
 
+def mkdir_p(outdir):
+    """ mkdir -p `outdir` """
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+
+
 class NodeResults(object):
 
-    def __init__(self, outfilename):
-        self.outfilename = outfilename
+    def __init__(self, outdir):
+        self.outdir = outdir
         self.neighbours = {}
 
         self.node_measures = {}
         self.node_finale_measures = {}
+
+        self.poisson = {}
+        self.clock = {}
+
+        mkdir_p(self.outdir)
+
+    def open(self, name, mode='w'):
+        """ Open result file """
+        outfile = os.path.join(self.outdir, name)
+        return open(outfile, mode)
 
     def handle_line(self, identifier, line):
         """ Print one line prefixed by id in format: """
@@ -61,104 +68,55 @@ class NodeResults(object):
 
         if 'Neighbours' in line:
             # A569;Neighbours;6;A869;A172;C280;9869;B679;A269
-            values = line.split(';')
-            node = values[0]
-            neighbours = values[3:]
-            self.neighbours[node] = neighbours
-            return
+            node, _, _, neighs = line.split(';', 3)
 
-        if 'Values' in line:
+            self.neighbours[node] = sorted(neighs.split(';'))
+
+        elif 'Values' in line:
             # A869;Values;100;1.9330742E9;2.0307378E9
-            items = line.split(';')
-            node = items[0]
-            num_compute = int(items[2])
-            values = [str(float(val)) for val in items[3:]]
+            node, _, num_compute, values = line.split(';', 3)
 
-            values_list = self.node_measures.setdefault(node, [])
-            values_d = {
-                'num_compute': num_compute,
-                'values': values
-            }
-            values_list.append(values_d)
-            return
+            values = [str(float(v)) for v in values.split(';')]
+            values_d = {'num_compute': int(num_compute), 'values': values}
 
-        if 'FinalValue' in line:
+            self.node_measures.setdefault(node, []).append(values_d)
+
+        elif 'FinalValue' in line:
             # A869;FinalValue;100;32
-            items = line.split(';')
-            node = items[0]
-            num_compute = int(items[2])
-            final_value = str(int(items[3]))
+            node, _, num_compute, final_value = line.split(';')
 
             self.node_finale_measures[node] = {
-                'num_compute': num_compute,
-                'value': final_value,
+                'num_compute': int(num_compute),
+                'value': str(int(final_value)),
             }
-            return
+        elif 'PoissonDelay' in line:
+            # 1062;PoissonDelay;4.9169922E-1
+            node, _, delay = line.split(';')
+            self.poisson.setdefault(node, []).append(float(delay))
 
-    def write_results(self, use_node_compute=True):
-        """ Write all the experiment results """
-        self.write_neighbours_graph()
-        self.write_results_values(use_node_compute)
-        self.write_results_final_value()
+        elif 'Clock' in line:
+            # 1062;Clock;4.9169922E-1;4.9169922E-1
+            node, _, sys_clock, virt_clock = line.split(';')
+            val = (time.time(), float(sys_clock), float(virt_clock))
+            self.clock.setdefault(node, []).append(val)
 
-    def write_results_final_value(self):
-        """ Write the 'final_value' result files if there is some data """
-        if not len(self.node_finale_measures):
-            return  # No final value
+    def write_neighbours(self):
+        """ Write neighbours output """
+        # Write neighbours table
+        with self.open('neighbours.csv') as neigh:
+            print "Neighbours table written to %s" % neigh.name
+            for key, values in sorted(self.neighbours.items()):
+                neigh.write('%s:%s\n' % (key, ';'.join(values)))
 
-        all_name = '%s_final_all.csv' % self.outfilename
-        all_measures = open(all_name, 'w')
-        print "Write all final value to %s" % all_name
-
-        # write data for each node
-        for node, val_d in self.node_finale_measures.items():
-
-            name = '%s_final_%s.csv' % (self.outfilename, node)
-            print "Write final value to %s" % name
-
-            # create the lines
-            line = '%s' % (val_d['value'])
-            all_line = '%s,%s' % (node, val_d['value'])
-
-            # write datas
-            with open(name, 'w') as measures:
-                measures.write(line + '\n')
-            all_measures.write(all_line + '\n')
-        all_measures.close()
-
-    def write_results_values(self, use_node_compute=True):
-        """ Write the results to files """
-        all_name = '%s_all.csv' % self.outfilename
-        all_measures = open(all_name, 'w')
-        print "Write all values to %s" % all_name
-
-        for node, values in self.node_measures.items():
-            name = '%s_%s.csv' % (self.outfilename, node)
-            print "Write values to %s" % name
-            measures = open(name, 'w')
-            for i, val_d in enumerate(values):
-                # use remote compute number or local compute number == num line
-                compute_num = val_d['num_compute'] if use_node_compute else i
-
-                # create the lines
-                csv_vals = ','.join(val_d['values'])
-                line = '%s,%s' % (compute_num, csv_vals)
-                all_line = '%s,%s,%s' % (node, compute_num, csv_vals)
-
-                measures.write(line + '\n')
-                all_measures.write(all_line + '\n')
-
-            measures.close()
-        all_measures.close()
-
-    def write_neighbours_graph(self):
-        neighb_graph = self.neighbours_graph()
-        out_dot = '%s_graph.dot' % self.outfilename
-        with open(out_dot, 'w') as dot_f:
+        # Write 'dot' file
+        neighb_graph = self._neighbours_graph()
+        with self.open('graph.dot') as dot_f:
+            out_dot = dot_f.name
+            print "Neighbours dot-graph written to %s" % out_dot
             dot_f.write(neighb_graph)
-        print "Neighbours dot-graph written to %s" % out_dot
 
-        out_png = '%s_graph.png' % self.outfilename
+        # Generate '.png' graph
+        out_png = os.path.join(self.outdir, 'graph.png')
         cmd = ['dot', '-T', 'png', out_dot, '-o', out_png]
         try:
             subprocess.call(cmd)
@@ -166,11 +124,10 @@ class NodeResults(object):
         except OSError:
             print "graphviz not installed. Can't generate neighbours graph"
             print "You can run the following command on your comuter:"
-            print "    dot -T png results_graph.dot -o results_graph.png"
+            print "    %s" % ' '.join(cmd)
 
-
-    def neighbours_graph(self):
-        links = self.neighbours_links()
+    def _neighbours_graph(self):
+        links = self._neighbours_links()
         res = ''
         res += 'digraph G {\n'
         res += '    center=""\n'
@@ -184,7 +141,8 @@ class NodeResults(object):
         res += '}\n'
         return res
 
-    def neighbours_links(self):
+    def _neighbours_links(self):
+        """ List of neighbours graph links """
         simple_links = set()
         double_links = set()
         for node, neighbours in self.neighbours.items():
@@ -200,43 +158,180 @@ class NodeResults(object):
                     double_links.add(link)
         return {'simple': simple_links, 'double': double_links}
 
+    @staticmethod
+    def nop(**_):
+        pass
+
+    def write_results(self):
+        self._write_results_values()
+        self._write_results_final_value()
+
+    def write_results_lambda_timestamp(self):
+        self._write_results_values(lambda_=0.2)
+        self._write_results_final_value()
+
+    def _poisson_timestamps_measures(self, lambda_):
+        """ Generate poisson distributed timestamps for measures """
+        num_values = max([len(v) for v in self.node_measures.values()])
+
+        # There is num_values + 1 values with 0 at first
+        timestamps = [0.0]
+        for i in range(0, num_values):
+            delay = - math.log(random.random()) / lambda_
+            timestamps.append(timestamps[i] + delay)
+
+        return timestamps
+
+    def _write_results_values(self, lambda_=0.0):
+        """ Write the results to files """
+        all_measures = self.open('results_all.csv')
+        print "Write all values to %s" % all_measures.name
+
+        # Generate a false poisson clock timestamp
+        # Using a real one would make the experiment take too long.
+        # Use lambda = lambda_ * num_nodes
+        if lambda_:
+            lambda_ *= len(self.node_measures)
+            poisson_times = self._poisson_timestamps_measures(lambda_)
+
+        for node, values in self.node_measures.items():
+            for i, val_d in enumerate(values, start=1):
+
+                # create the lines
+                csv_vals = ','.join(val_d['values'])
+                all_line = '%s,%s,%s' % (node, i, csv_vals)
+
+                if lambda_:
+                    all_line += ',%f' % poisson_times[i]
+
+                all_measures.write(all_line + '\n')
+
+        all_measures.close()
+
+    def _write_results_final_value(self):
+        """ Write the 'final_value' result files if there is some data """
+        if not len(self.node_finale_measures):
+            return  # No final value
+
+        all_measures = self.open('final_all.csv')
+        print "Write all final value to %s" % all_measures.name
+
+        # write data for each node
+        for node, val_d in self.node_finale_measures.items():
+            # create the lines
+            all_line = '%s,%s' % (node, val_d['value'])
+            all_measures.write(all_line + '\n')
+        all_measures.close()
+
+    def write_poisson(self):
+        """ Write the poisson delay results """
+        all_measures = self.open('delay_all.csv')
+        print "Write all final value to %s" % all_measures.name
+
+        for node, values in self.poisson.items():
+            # Print 1/mean
+            mean = sum(values) / float(len(values))
+            print 'Poisson: %s: 1/mean == %f' % (node, 1./mean)
+            # Save values in file
+            for val in values:
+                all_measures.write('%s,%f\n' % (node, val))
+
+        all_measures.close()
+
+    def write_clock(self):
+        """ Write the clock results """
+        all_measures = self.open('clock_all.csv')
+        print "Write all final value to %s" % all_measures.name
+
+        for node, values in self.clock.items():
+            # Save values in file
+            for timestamp, sys_clock, virt_clock in values:
+                all_measures.write('%s,%f,%f,%f\n' % (node, timestamp,
+                                                      sys_clock, virt_clock))
+
+        all_measures.close()
+
 
 ALGOS = {
-    'syncronous': algorithm_management.syncronous_mode,
-    'gossip': algorithm_management.gossip_mode,
-    'num_nodes': algorithm_management.find_num_node_gossip_mode,
+    'create_graph': (_algos.create_graph, 'write_neighbours'),
+    'print_graph': (_algos.print_graph, 'write_neighbours'),
+    'load_graph': (_algos.load_graph, 'nop'),
+
+    'synchronous': (_algos.synchronous, 'write_results'),
+
+    'gossip': (_algos.gossip, 'write_results_lambda_timestamp'),
+    'num_nodes': (_algos.num_nodes_gossip, 'write_results_lambda_timestamp'),
+
+    'clock_convergence': (_algos.clock_convergence, 'write_clock'),
+
+    'print_poisson': (_algos.print_poisson, 'write_poisson'),
 }
+
+
+def parse():
+    parser = opts_parser()
+    opts = parser.parse_args()
+
+    if (opts.algo in ['load_graph', 'synchronous', 'gossip', 'num_nodes',
+                      'clock_convergence'] and
+            opts.neighbours is None):
+        parser.error('neighbours not provided')
+    if (opts.algo in ['synchronous', 'gossip', 'num_nodes', 'print_poisson']
+            and opts.num_loop is None):
+        parser.error('num_loop not provided')
+    if opts.algo in ['clock_convergence'] and opts.duration is None:
+        parser.error('duration not provided')
+
+    return opts
+
+
+def algorithm_main(algorithm):
+    """ Algorithm generic main function """
+    opts = _parser.algorithm_parser().parse_args()
+    run(algorithm, opts)
+
+
+def poisson_main(algorithm):
+    """ Algorithm poisson generic main function """
+    opts = _parser.poisson_parser().parse_args()
+    run(algorithm, opts)
+
+
+def run(algo, opts):
+    """ Execute 'algorithm' and 'handle_result' function name with 'opts'"""
+
+    algorithm, handle_result = ALGOS[algo]
+
+    try:
+        opts.with_a8 = False  # HACK for the moment, required by 'select_nodes'
+        opts.nodes_list = serial.SerialAggregator.select_nodes(opts)
+    except (ValueError, RuntimeError) as err:
+        print >> sys.stderr, "Error while calculating nodes list:\n\t%s" % err
+        exit(1)
+
+    results = NodeResults(opts.outdir)
+
+    handle_result_fct = getattr(results, handle_result)
+
+    # Connect to the nodes
+    with serial.SerialAggregator(opts.nodes_list, print_lines=True,
+                                 line_handler=results.handle_line) as aggr:
+        time.sleep(2)
+        # Run the algorithm
+        algorithm(aggr, **vars(opts))
+        time.sleep(3)
+
+    # Manage the results
+    handle_result_fct()
 
 
 def main():
     """ Reads nodes from ressource json in stdin and
     aggregate serial links of all nodes
     """
-    parser = opts_parser()
-    opts = parser.parse_args()
-
-    try:
-
-        opts.with_a8 = False  # HACK for the moment, required by 'select_nodes'
-        nodes_list = serial.SerialAggregator.select_nodes(opts)
-        print "Using algorith: %r" % opts.algo
-        algorithm = ALGOS[opts.algo]
-    except (ValueError, RuntimeError) as err:
-        sys.stderr.write("%s\n" % err)
-        exit(1)
-
-    # Connect to the nodes
-    results = NodeResults(opts.outfile)
-    with serial.SerialAggregator(nodes_list,
-                                 print_lines=True,
-                                 line_handler=results.handle_line)\
-            as aggregator:
-        time.sleep(2)
-        # Run the algorithm
-        algorithm(aggregator, opts.num_loop)
-        time.sleep(3)
-
-    results.write_results(opts.algo == 'syncronous')
+    opts = parse()
+    print "Using algorithm: %r" % opts.algo
+    run(opts.algo, opts)
 
 
 if __name__ == "__main__":

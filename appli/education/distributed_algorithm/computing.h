@@ -28,10 +28,17 @@ double compute_value_from_neighbours(double my_value, uint32_t n_neighbours,
 double compute_value_from_gossip(double my_value, double neigh_value);
 uint32_t compute_final_value();
 
+/* Network management */
+void computing_send_values(uint8_t should_compute);
+
+void computing_handle_values(uint16_t src_addr,
+        const uint8_t *data, size_t length, int neighbours_values);
 
 
 // General functions managing the multiples values
 void compute_all_values_from_gossip(struct received_values *neigh_values);
+
+
 
 
 #endif//COMPUTING_H

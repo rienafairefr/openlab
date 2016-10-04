@@ -1,7 +1,9 @@
-#include <math.h>
-#include "computing.h"
-#include "random.h"
+#include <string.h>
 #include <stdlib.h>
+#include <math.h>
+#include "random.h"
+#include "radio_network.h"
+#include "computing.h"
 
 double init_value()
 {
@@ -76,3 +78,52 @@ void compute_all_values_from_gossip(struct received_values *neigh_values)
     }
 }
 
+
+/* --------------------------------------------------------------------------
+ * Network management
+ * -------------------------------------------------------------------------- */
+
+/*
+ * Values management
+ */
+struct values_pkt {
+    uint8_t type;
+    uint8_t should_compute;
+    uint32_t num_neighbours;
+    struct values values;
+};
+
+void computing_send_values(uint8_t should_compute)
+{
+    struct values_pkt pkt;
+    memset(&pkt, 0, sizeof(pkt));
+
+    // Header
+    pkt.type           = PKT_VALUES;
+    pkt.should_compute = should_compute;
+    pkt.num_neighbours = num_neighbours;
+    // Values
+    memcpy(&pkt.values, &my_values, sizeof(struct values));
+
+    network_send(&pkt, sizeof(struct values_pkt));
+}
+
+
+void computing_handle_values(uint16_t src_addr,
+        const uint8_t *data, size_t length, int neighbour_index)
+{
+    if (sizeof(struct values_pkt) != length)
+        ERROR("Invalid Values pkt len\n");
+
+    struct values_pkt pkt;
+    memcpy(&pkt, data, sizeof(struct values_pkt));
+
+    struct received_values *neigh_values = &neighbours_values[neighbour_index];
+    neigh_values->valid = 1;
+    neigh_values->num_neighbours = pkt.num_neighbours;
+    memcpy(&neigh_values->values, &pkt.values, sizeof(struct values));
+
+    // Gossip mode, compute after each measures received
+    if (pkt.should_compute)
+        compute_all_values_from_gossip(neigh_values);
+}
