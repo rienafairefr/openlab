@@ -165,6 +165,19 @@ static int parking_off(int argc, char **argv)
     return 0;
 }
 
+static int traffic_echo(int argc, char **argv)
+{
+    uint16_t vehicle_count = 0;
+    if (argc == 2) {
+        if (1 != sscanf(argv[1], "%u", &vehicle_count))
+            return 1;
+    }
+    printf("{\"count\":%d}\n", vehicle_count);
+
+
+    return 0;
+}
+
 static int random_on(int argc, char **argv)
 {
     has_random_at_start = 1;
@@ -210,6 +223,7 @@ struct shell_command commands[] = {
     {"sensors_off",         "Stop sensors measure",              sensors_off},
     {"parking_on",          "[average delay:seconds] Start parking simulator. Default 30s, min 1s", parking_on},
     {"parking_off",         "Stop parking simulator",              parking_off},
+    {"traffic",             "[vehicle count]  Send traffic event",                     traffic_echo},
     {"random_on",           "Add a random delay before starting measures, default ON", random_on},
     {"random_off",          "No random delay before starting measures.",               random_off},
     {NULL, NULL, NULL},
