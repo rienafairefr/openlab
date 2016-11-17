@@ -186,6 +186,28 @@ static int traffic_echo(int argc, char **argv)
     return 0;
 }
 
+static int pollution_echo(int argc, char **argv)
+{
+    float ozone, particles, carbon_o, sulfure_o2, nitrogen_o2;
+    if (argc != 2)
+        return 1;
+    if (5 != sscanf(argv[1], "%f,%f,%f,%f,%f",
+                 &ozone, &particles, &carbon_o, &sulfure_o2, &nitrogen_o2))
+        return 1;
+
+    printf("{");
+    printf("\"device_type\":\"sensor\",");
+    printf("\"name\":\"environment_event\",");
+    printf("\"ozone\":%f,", ozone);
+    printf("\"particles\":%f,", particles);
+    printf("\"carbon_monoxide\":%f,", carbon_o);
+    printf("\"sulfure_dioxide\":%f,", sulfure_o2);
+    printf("\"nitrogen_dioxide\":%f", nitrogen_o2);
+    printf("}\n");
+
+    return 0;
+}
+
 static int random_on(int argc, char **argv)
 {
     has_random_at_start = 1;
@@ -232,6 +254,7 @@ struct shell_command commands[] = {
     {"parking_on",          "[average delay:seconds] Start parking simulator. Default 30s, min 1s", parking_on},
     {"parking_off",         "Stop parking simulator",              parking_off},
     {"traffic",             "[vehicle count]  Send traffic event",                     traffic_echo},
+    {"pollution",           "[o2,particles,co,so2,no2]  Send pollution event",         pollution_echo},
     {"random_on",           "Add a random delay before starting measures, default ON", random_on},
     {"random_off",          "No random delay before starting measures.",               random_off},
     {NULL, NULL, NULL},
