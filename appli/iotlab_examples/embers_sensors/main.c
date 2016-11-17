@@ -63,8 +63,10 @@ static int sensors_handler(handler_arg_t arg)
     lps331ap_read_pres(&pres);
 
     printf("{");
+    printf("\"device_type\":\"sensor\",");
+    printf("\"name\":\"environment_event\",");
     printf("\"temperature\":%f,", 42.5 + temp / 480.0);
-    printf("\"luminosity\":%f,", lum);
+    printf("\"light\":%f,", lum);
     printf("\"pressure\":%f", pres / 4096.0 ); // No comma at the end
     printf("}\n");
 
@@ -98,8 +100,11 @@ static int parking_handler(handler_arg_t arg)
 
     parking_busy = !parking_busy;
     set_parking_led();
-    printf("{\"parking\":%d}\n", (parking_busy ? 1: 0));
-
+    printf("{");
+    printf("\"device_type\":\"sensor\",");
+    printf("\"name\":\"park_event\",");
+    printf("\"status\":%d", (parking_busy ? 1: 0));
+    printf("}\n");
     return poisson_step_ticks(timer->param_delay);
 }
 
@@ -172,9 +177,12 @@ static int traffic_echo(int argc, char **argv)
         if (1 != sscanf(argv[1], "%u", &vehicle_count))
             return 1;
     }
-    printf("{\"count\":%d}\n", vehicle_count);
-
-
+    printf("{");
+    printf("\"device_type\":\"sensor\",");
+    printf("\"name\":\"traffic_event\",");
+    printf("\"count\":%d", vehicle_count);
+    printf("}\n");
+    
     return 0;
 }
 
