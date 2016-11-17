@@ -172,11 +172,12 @@ static int parking_off(int argc, char **argv)
 
 static int traffic_echo(int argc, char **argv)
 {
-    uint16_t vehicle_count = 0;
-    if (argc == 2) {
-        if (1 != sscanf(argv[1], "%u", &vehicle_count))
-            return 1;
-    }
+    uint16_t vehicle_count;
+    if (argc != 2)
+        return 1;
+    if (1 != sscanf(argv[1], "%u", &vehicle_count))
+        return 1;
+
     printf("{");
     printf("\"device_type\":\"sensor\",");
     printf("\"name\":\"traffic_event\",");
