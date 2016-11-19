@@ -198,7 +198,7 @@ static int pollution_echo(int argc, char **argv)
 
     printf("{");
     printf("\"device_type\":\"sensor\",");
-    printf("\"name\":\"environment_event\",");
+    printf("\"name\":\"pollution_event\",");
     printf("\"ozone\":%f,", ozone);
     printf("\"particles\":%f,", particles);
     printf("\"carbon_monoxide\":%f,", carbon_o);
