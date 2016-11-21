@@ -102,7 +102,7 @@ static int parking_handler(handler_arg_t arg)
     set_parking_led();
     printf("{");
     printf("\"device_type\":\"sensor\",");
-    printf("\"name\":\"park_event\",");
+    printf("\"name\":\"parking_event\",");
     printf("\"status\":%d", (parking_busy ? 1: 0));
     printf("}\n");
     return poisson_step_ticks(timer->param_delay);
