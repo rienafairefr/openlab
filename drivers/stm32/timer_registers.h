@@ -145,6 +145,10 @@ enum
 
 enum
 {
+    TIMER_SR__CC4OF = 0x1000,
+    TIMER_SR__CC3OF = 0x0800,
+    TIMER_SR__CC2OF = 0x0400,
+    TIMER_SR__CC1OF = 0x0200,
     TIMER_SR__TIF = 0x0040,
     TIMER_SR__CC4IF = 0x0010,
     TIMER_SR__CC3IF = 0x0008,
@@ -152,7 +156,11 @@ enum
     TIMER_SR__CC1IF = 0x0002,
     TIMER_SR__UIF = 0x0001,
 
-    TIMER_SR__TIF_bit = 5,
+    TIMER_SR__CC4OF_bit = 12,
+    TIMER_SR__CC3OF_bit = 11,
+    TIMER_SR__CC2OF_bit = 10,
+    TIMER_SR__CC1OF_bit = 9,
+    TIMER_SR__TIF_bit = 6,
     TIMER_SR__CC4IF_bit = 4,
     TIMER_SR__CC3IF_bit = 3,
     TIMER_SR__CC2IF_bit = 2,
