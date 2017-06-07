@@ -20,13 +20,13 @@ double compute_value_from_neighbours(double my_value, uint32_t my_degree,
 {
 
     double new_value = my_value;
-    int i;
+    int j;
 
-    for (i = 0; i < MAX_NUM_NEIGHBOURS; i++) {
-        if (!neighbours_vals[i].valid)
+    for (j = 0; j < MAX_NUM_NEIGHBOURS; j++) {
+        if (!neighbours_vals[j].valid)
             continue;
-        uint32_t neighbour_degree = neighbours_vals[i].num_neighbours;
-        double neighbour_value = neighbours_vals[i].values.v[value_num];
+        uint32_t neighbour_degree = neighbours_vals[j].num_neighbours;
+        double neighbour_value = neighbours_vals[j].values.v[value_num];
 
         // Add contribution for this neighbour with
         // neighbour_degree and neighbour_value
