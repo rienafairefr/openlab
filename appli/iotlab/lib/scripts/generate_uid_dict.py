@@ -54,7 +54,10 @@ def extract_nodes_uids(nodes_list):
 
     for node_dict in nodes_list:
         url = str(node_dict["network_address"])
-        radio = node_dict["archi"].split(':')[1]
+        try:
+            radio = node_dict["archi"].split(':')[1]
+        except IndexError:
+            radio = ''
         uid = str(node_dict['uid']).lower()
         archi, num = url.split('.')[0].split('-')
 
