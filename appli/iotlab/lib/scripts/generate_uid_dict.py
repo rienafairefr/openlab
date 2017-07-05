@@ -60,6 +60,9 @@ def extract_nodes_uids(nodes_list):
             radio = ''
         uid = str(node_dict['uid']).lower()
         archi, num = url.split('.')[0].split('-')
+        # hack: handle only m3 and a8 for the moment
+        if archi not in ('m3', 'a8'):
+            continue
 
         # uids stored per radio_type
         radio_dict = uids_dict.setdefault(radio, {})
