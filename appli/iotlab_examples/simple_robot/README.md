@@ -4,8 +4,7 @@
 
 This example shows how to use a mobile node embedded on a robot (Turtlebot 2 or Wifibot) with predefined trajectories.
 
-This firmware is used in the tutorial:
-https://www.iot-lab.info/tutorials/submit-an-experiment-with-a-mobile-m3-nodes-using-the-web-portal/
+This firmware is used in the [Do a circuit loop with a mobile M3 node](https://www.iot-lab.info/tutorials/do-a-circuit-loop-with-a-mobile-m3-node/) tutorial.
 
 
 ## Code
