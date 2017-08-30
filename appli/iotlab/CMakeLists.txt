@@ -8,6 +8,7 @@ add_subdirectory(idle_with_dc)
 
 
 add_subdirectory(node_radio_characterization)
+add_subdirectory(radio_test)
 
 # Libraries
 add_subdirectory(autotest_common)
