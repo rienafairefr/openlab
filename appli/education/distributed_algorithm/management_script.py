@@ -11,6 +11,8 @@ import random
 import math
 
 from iotlabaggregator import serial
+import iotlabcli
+import iotlabcli.experiment
 
 import algorithm_management as _algos
 import parser as _parser
@@ -133,10 +135,13 @@ class NodeResults(object):
         res += '    center=""\n'
         res += '    concentrate=true\n'
         res += '    graph [ color=black ]\n'
+        lookup_node_name.lookup = get_node_uids_lookup()
         for (node, neigh) in links['double']:
+            node, neigh = (get_node_label(node), get_node_label(neigh))
             res += '    "%s" -> "%s"[color=black]\n' % (node, neigh)
             res += '    "%s" -> "%s"[color=black]\n' % (neigh, node)
         for (node, neigh) in links['simple']:
+            node, neigh = (get_node_label(node), get_node_label(neigh))
             res += '    "%s" -> "%s"[color=red]\n' % (node, neigh)
         res += '}\n'
         return res
@@ -323,6 +328,22 @@ def run(algo, opts):
 
     # Manage the results
     handle_result_fct()
+
+
+def get_node_uids_lookup():
+    api = iotlabcli.Api(* iotlabcli.get_user_credentials())
+    info = iotlabcli.experiment.info_experiment(api)
+    return  { x["uid"]: x["network_address"].split('.')[0]
+                  for x in info["items"] }
+
+
+def get_node_label(node_uid):
+    fmt = "{}\n{}"
+    return fmt.format(lookup_node_name(node_uid), node_uid)
+
+
+def lookup_node_name(node_uid):
+    return lookup_node_name.lookup[node_uid.lower()]
 
 
 def main():
