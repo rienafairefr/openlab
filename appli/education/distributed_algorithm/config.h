@@ -11,6 +11,7 @@
 
 #define NUM_VALUES           1
 
+// threshold for selecting neighbours, approx range: -90dBm to -50dBm
 #define MIN_RSSI           -70
 
 #define TIME_SCALE           1.0
