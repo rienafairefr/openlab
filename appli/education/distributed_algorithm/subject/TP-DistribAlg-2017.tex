@@ -15,9 +15,9 @@
 \begin{document}
 \title{
 {\normalsize Lab sessions for the class}\\[-1mm]
-Distributed Algorithms and Network Systems\\[-2mm]
-{\normalsize MiSCIT Master -- Grenoble -- fall 2016}\\[-1mm]
-{\normalsize prepared by Federica Garin and Ga\"{e}tan Harter}}
+Distributed Algorithms and Network Systems\\[-1mm]
+{\normalsize MiSCIT Master -- Grenoble -- fall 2017}\\[-1mm]
+{\normalsize prepared by Federica Garin, Ga\"{e}tan Harter, and Olivier Fambon}}
 \date{}
 \maketitle
 %\vspace{-2cm}
@@ -30,7 +30,7 @@ You will use the experimental platform FIT/IoT-lab (\url{https://www.iot-lab.inf
 to execute your algorithms on real microcontrollers communicating through radio.\\
 
 You are required to write a report, which will be graded.\\ Send it by e-mail to \texttt{federica.garin@inria.fr}.\\
-Deadline: Wednesday, Nov.~30th.\\
+Deadline: Wednesday, Nov.~1st.\\
 
 Recommendations for a good report:
 \begin{itemize}
@@ -53,21 +53,33 @@ To familiarize yourself with the use of the platform:
 \item Read the testbed presentation at: \url{https://www.iot-lab.info/what-is-iot-lab/}
 \end{itemize}
 
+% OLD (2016)
+%%%Then go to the page of tutorials and the following four tutorials (First steps):
+%%%\begin{center} \url{https://www.iot-lab.info/tutorials/} \end{center}
+%%%\begin{itemize}
+%%%\item Configure your SSH access;
+%%%\item Submit an experiment with Web portal: M3 nodes;
+%%%\item Get and compile a firmware code for a M3 node.
+%%%\item Tools$\to$Node-cli client (Update firmware from command line)
+%%%\end{itemize}
+
 Then go to the page of tutorials and the following four tutorials (First steps):
 \begin{center} \url{https://www.iot-lab.info/tutorials/} \end{center}
 \begin{itemize}
-    \item \href{https://www.iot-lab.info/tutorials/configure-your-ssh-access/}{SSH access (Configure IoT-LAB access)}
-    \item \href{https://www.iot-lab.info/tutorials/submit-an-experiment-with-web-portal-and-m3-nodes/}{M3 nodes (Submit an experiment)}
-    \item \href{https://www.iot-lab.info/tutorials/get-compile-a-m3-firmware-code/}{Build M3 and A8-M3 firmware (Compile firmware code for IoT-LAB)}
-    \item \href{https://www.iot-lab.info/tutorials/node-cli-client/}{Tools$\to$Node-cli client (Update firmware from command line)}
+   \item SSH access (Configure IoT-LAB access): \\
+   \url{https://www.iot-lab.info/tutorials/configure-your-ssh-access/}
+   \item M3 nodes (Submit and experiment with web portal): \\
+   \url{https://www.iot-lab.info/tutorials/submit-an-experiment-with-web-portal-and-m3-nodes/}
+   \item Build M3 and A8-M3 firmware (Compile firmware code for IoT-LAB)\\
+   \url{https://www.iot-lab.info/tutorials/get-compile-a-m3-firmware-code/}
+   \item Tools $\to$ Node -- cli client (Update firmware from command line) \\
+   \url{https://www.iot-lab.info/tutorials/node-cli-client/}
 \end{itemize}
+
+
 
 \section{Provided files}
 
-%For this lab, you are given
-%an already-written firmware that allows you to interact with the nodes, and which has two modes, either synchronous or gossip.
-%In synchronous mode, there is a global notion of discrete-time iterations: at each iteration, all communications take place, then all local computations are done.
-%In gossip mode, at each iteration a random node is selected to send its state; all neighbors having received such message immediately proceed to do a local computation and update local state.
 For this lab, you are given
 an already-written firmware that allows you to interact with the nodes,
 either in synchronous or gossip mode.
@@ -75,7 +87,7 @@ You will start by using the synchronous mode,
 where there is a global notion of discrete-time iterations: at each iteration,
 all communications take place, then all local computations are done.
 
-%In gossip mode (more precisely, this is a broadcast gossip), each node has a local Poisson clock; when a node is activated by its Poisson clock, it sends its state to its neighbors; all neighbors having received such message immediately proceed to do a local computation and update local state.
+In gossip mode (more precisely, this is a broadcast gossip), each node has a local Poisson clock; when a node is activated by its Poisson clock, it sends its state to its neighbors; all neighbors having received such message immediately proceed to do a local computation and update local state.
 
 
 There are python scripts already written for you; the thing you will need to do
@@ -86,7 +98,7 @@ the required computations.
 
 To simplify usage compared to what you did in the tutorial, a symbolic link has been
 created in your home directory on the server \verb=~/distributed_algorithm=.
-And everything can be done from this this directory.\\
+Everything can be done from this directory.\\
 
 
 You should:
@@ -119,10 +131,11 @@ This is where the files are sitting, that can be modified by you.
             too sparse (disconnected) or too dense (too many communications, not
             an interesting example of distributed computing).\\
             This signal strength is in dB, and there is a minus sign before the value,
-            so putting a higher value means decreasing strength.
+            so putting a higher number means decreasing strength.
+            You should only use values between -90dB (noise level) and -55dB (max RSSI).
          \item Some parameters of the local system clocks (to be used in the clock-synchronization exercice): \verb=TIME_SCALE=, \verb=TIME_SCALE_RANDOM=, and \verb=TIME_OFFSET_RANDOM=.
 		\end{itemize}
-    \item A \verb=subject= directory with \LaTeX~sources of the subject.
+    \item A \verb=subject= directory with \LaTeX~sources of the document that you are now reading.
     \item A \verb=results= directory to put all exercices intermediate results.
 	\end{itemize}
 \end{itemize}
@@ -153,9 +166,9 @@ The following function are of your interest:
         Notice: if you are able to add the
         contribution of each neighbor incrementally, you can use the
         already-written code to parse the structure of received values, so that
-        you do not need to worry about that: at iteration $i$, which concerns
-        the neighbor $i$, \verb=neighbour_degree= is the degree of $i$ and
-        \verb=neighbour_value= is the value (the state) of $i$.
+        you do not need to worry about that: at iteration $j$, which concerns
+        the neighbor $j$, \verb=neighbour_degree= is the degree of $j$ and
+        \verb=neighbour_value= is the value (the state) of $j$.
         % Also notice: when there is more than one state per node (\verb=NUM_VALUES=$\ge 2$), this function is called many times, one per each state (it operates on a scalar state, not vector).
 	\item \verb=compute_value_from_gossip= has to be used only in gossip mode, for consensus.\\
         It allows a node to compute its new state, given its old state and the received state
@@ -163,8 +176,10 @@ The following function are of your interest:
 %	\item \verb=compute_final_value= is needed when computing the estimated number of nodes, after the gossip max-consensus algorithm
 \end{itemize}
 
+\subsubsection{Clock synchronization: clock\_convergence.c}
+
 You will use \verb=clock_convergence.c= for clock synchronization exercices.
-The following function are of your interest:
+The following functions are of your interest:
 
 \begin{itemize}
 	\item \verb=clock_convergence_virtual_time= computes the current virtual time of a node
@@ -192,7 +207,39 @@ experiment and click on \textbf{Reload}. This will ensure you are using the
 same nodes. If you use different nodes you will have to re-generate the network
 graph on new experiments (explained later).
 
-\subsubsection{Commands to edit, compile and flash}
+\subsubsection{Generating communication graph}
+
+This creates the communication graph that
+will be used for your experiments. It can be generated \textbf{once and for all} and
+reused across experiments.
+
+\paragraph{On the server}
+
+Run from the \verb=distrubuted_algorithm= directory.
+
+\begin{verbatim}# Generates graph in results/communication_graph/
+~/distributed_algorithm$ ./network_graph_create.py -o results/communication_graph/
+
+~/distributed_algorithm$ ls results/communication_graph
+graph.dot  graph.png  neighbours.csv \end{verbatim}
+
+It generates two important files:
+\texttt{neighbours.csv} which will be used by the algorithms and
+\texttt{graph.png} which is the graphical representation for visualization.
+
+\paragraph{On your computer} Download graph and visualize it:
+\begin{verbatim}your_computer:~$ scp -Cr miscitXX@grenoble.iot-lab.info:~/distributed_algorithm/ ~/
+eog distributed_algorithm/results/communication_graph/graph.png\end{verbatim}
+
+\textbf{Warning:} This command overwrites  what you may have written
+in your local \verb=distributed_algorithm= directory. So don't modify files in there.\\
+
+If your graph is not connected or too dense you may want to generate another one.
+First change the \verb=config.h -> MIN_RSSI= value. Decreasing the value
+increases connectivity. Then compile, flash and re-run the graph generation (see Sect.~\ref{subsect:edit-compile-flash}).
+
+
+\subsubsection{Commands to edit, compile and flash} \label{subsect:edit-compile-flash}
 
 Everything is done in the \verb=~/distributed_algorithm= directory:
 \begin{verbatim}
@@ -226,36 +273,6 @@ make -C ../../../build.m3 distributed_algorithm
 
 \end{itemize}
 
-\subsubsection{Generating communication graph}
-
-This creates the communication graph that
-will be used for your experiments. It can be generated \textbf{once and for all} and
-reused across experiments.
-
-\paragraph{On the server}
-
-Run from the \verb=distrubuted_algorithm= directory.
-
-\begin{verbatim}# Generates graph in results/communication_graph/
-~/distributed_algorithm$ ./network_graph_create.py -o results/communication_graph/
-
-~/distributed_algorithm$ ls results/communication_graph
-graph.dot  graph.png  neighbours.csv \end{verbatim}
-
-It generates two important files:
-\texttt{neighbours.csv} which will be used by the algorithms and
-\texttt{graph.png} which is the graphical representation for visualization.
-
-\paragraph{On your computer} Download graph and visualize it:
-\begin{verbatim}your_computer:~$ scp -Cr miscitXX@grenoble.iot-lab.info:~/distributed_algorithm/ ./
-eog distributed_algorithm/results/communication_graph/graph.png\end{verbatim}
-
-\textbf{Warning:} This command overwrites overwrites what you may have written
-in your local \verb=distributed_algorithm= directory. So don't modify files in there.\\
-
-If your graph is not connected or too dense you may want to generate another one.
-First change the \verb=config.h -> MIN_RSSI= value. Decreasing the value
-increases connectivity. Then compile, flash and re-run the graph generation.
 
 \subsection{Running experiments for the exercices}
 
@@ -301,7 +318,7 @@ You can try the default code with \verb=algo_synchronous.py= a \verb=--num-loop=
 To download the results, open another terminal, on which you are not going to do ssh, just stay on your home directory.
 Type the following command to download the whole project directory:
 \begin{verbatim}
-your_computer:~$ scp -Cr miscitXX@grenoble.iot-lab.info:distributed_algorithm/ ./
+your_computer:~$ scp -Cr miscitXX@grenoble.iot-lab.info:distributed_algorithm/ ~/
 \end{verbatim}
 
 Your local \verb=~/distributed_algorithm= directory will match the server files hierarchy.
@@ -319,13 +336,13 @@ a file \verb=results_all.csv=, with the same three columns as above, plus a four
 \item For clock synchronization (\verb=algo_clock_convergence.py=):
 a file \verb=clock_all.csv=, with a first column with the node label, a second column with the timestamp (server time, i.e., absolute time, which is unknown to the nodes but useful for us for analysis purposes), then a third column whith the local system time, and a fourth column with the local virtual time.
 \end{itemize}
-If you tested the default source code, you can see the result in \verb=distributed_algorithm/results/ex_0_test/results_all.csv=.
+If you tested the default source code for consensus, you can see the result in:\\ \verb=distributed_algorithm/results/ex_0_test/results_all.csv=\\
 In this case, a simple maximum is calculated.
 
 
 \newpage
 
-\newpage
+
 
 \section{Synchronous consensus}
 You are given a setup where communications are synchronized (at each iteration,
@@ -334,8 +351,9 @@ You will implement some consensus algorithm (as described in class and in the tu
 
 
 \subsection{Synchronous Metropolis LTI average consensus}
-\textbf{Algorithm to be implemented:}
-Initialize $x(0)$ with some values (the goal is to compute the average of such initial values). Run linear consensus algorithm $x(k+1) = P x(k)$ where the matrix $P$ is a doubly-stochastic matrix consistent with the given communication graph; to construct a $P$ satisfying these requirements, use the Metropolis-Hastings weights. \\
+\textbf{Algorithm to be implemented:}\\
+Initialization: $x(0)$ is initialized with some values (this is already done for you); the goal is to compute the average of such initial values. \\
+Run linear consensus algorithm $x(k+1) = P x(k)$ where the matrix $P$ is a doubly-stochastic matrix consistent with the given communication graph; to construct a $P$ satisfying these requirements, use the Metropolis-Hastings weights. \\
 Suggestion: use $30$ nodes and $100$ iterations
 %(or better, first run once with very few iterations, just to check the graph construction works correctly, then run again with $100$ iterations)\\
 
@@ -383,7 +401,7 @@ Hint: write down the entry-wise version of the equation $x(k+1) = P x(k)$ with t
 %\end{itemize}
 
 
-
+\newpage
 \section{Broadcast-gossip average consensus}
 You are given a broadcast gossip transmission scheme. Before starting, read Appendix~A for a reminder about this.
 For this exercice, you will be using a Poisson clock generated by a centralized scheduler (i.e., the second of the two equivalent constructions described in Appendix~A); this allows a speed-up of the experiment, since collisions can be avoided by the scheduler even at a higher frequency of transmission, while a higher waiting time would have been chosen to ensure little collision probability in a fully decentralized scheme.\\
@@ -418,7 +436,7 @@ Try to find a mathematical expression for $\bar P$, involving the Adjacency or t
 } %end blue italic
 
 
-
+\newpage
 \section{Broadcast-gossip clock-synchronization}
 You will be implementing the `RandSync-Bcast' clock-synchronization protocol introduced in \cite{RandSync-journal}.
 
@@ -499,7 +517,7 @@ For each experiment, plot both system clocks and virtual clocks, and comment the
 Bonus question. Notice that virtual times obtained with this algorithms might not be monotonic increasing: at some jumps due to the updates they might be decreasing. Propose a modified virtual time, based on the current one, which is ensured to be monotonic increasing; describe your definition mathematically, and then plot this new virtual time.
 } %end blue italic
 
-
+\newpage
 \section*{Appendix A -- Broadcast gossip and Poisson clock}
 This paragraph is a reminder about broadcast gossip with Poisson clock. See also the original description: paragraph `Asynchronous time model' in Sect.~I-A of the paper \cite{gossip-poisson}.\\
 
