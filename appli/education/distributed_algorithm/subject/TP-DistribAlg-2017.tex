@@ -65,7 +65,7 @@ To familiarize yourself with the use of the platform:
 
 Then go to the page of tutorials and the following four tutorials (First steps):
 \begin{center} \url{https://www.iot-lab.info/tutorials/} \end{center}
-\begin{itemize}
+\begin{enumerate}
    \item SSH access (Configure IoT-LAB access): \\
    \url{https://www.iot-lab.info/tutorials/configure-your-ssh-access/}
    \item M3 nodes (Submit and experiment with web portal): \\
@@ -74,7 +74,10 @@ Then go to the page of tutorials and the following four tutorials (First steps):
    \url{https://www.iot-lab.info/tutorials/get-compile-a-m3-firmware-code/}
    \item Tools $\to$ Node -- cli client (Update firmware from command line) \\
    \url{https://www.iot-lab.info/tutorials/node-cli-client/}
-\end{itemize}
+\end{enumerate}
+
+Make sure you have completed all tutorials before proceeding.
+
 
 
 
@@ -103,7 +106,6 @@ Everything can be done from this directory.\\
 
 You should:
 \begin{itemize}
-\item Follow the instructions in the tutorial to configure your ssh access
 \item Open a terminal, use \verb=ssh= to connect to your account and \\
     use \verb=cd= to change to \verb=distributed_algorithm= directory:
     \begin{verbatim}your_computer:$ ssh miscitXX@grenoble.iot-lab.info
@@ -190,7 +192,7 @@ The following functions are of your interest:
         In this function you need to suitably choose parameters $\alpha$ and $q$.
 \end{itemize}
 
-\subsection{Running experiments for the exercices}
+\subsection{Getting ready for the exercices}
 
 \paragraph{First experiment} Book nodes for your experiment as in the tutorial.
 \begin{itemize}
@@ -206,38 +208,6 @@ but do not associate (yet) any firmware with the nodes.
 experiment and click on \textbf{Reload}. This will ensure you are using the
 same nodes. If you use different nodes you will have to re-generate the network
 graph on new experiments (explained later).
-
-\subsubsection{Generating communication graph}
-
-This creates the communication graph that
-will be used for your experiments. It can be generated \textbf{once and for all} and
-reused across experiments.
-
-\paragraph{On the server}
-
-Run from the \verb=distrubuted_algorithm= directory.
-
-\begin{verbatim}# Generates graph in results/communication_graph/
-~/distributed_algorithm$ ./network_graph_create.py -o results/communication_graph/
-
-~/distributed_algorithm$ ls results/communication_graph
-graph.dot  graph.png  neighbours.csv \end{verbatim}
-
-It generates two important files:
-\texttt{neighbours.csv} which will be used by the algorithms and
-\texttt{graph.png} which is the graphical representation for visualization.
-
-\paragraph{On your computer} Download graph and visualize it:
-\begin{verbatim}your_computer:~$ scp -Cr miscitXX@grenoble.iot-lab.info:~/distributed_algorithm/ ~/
-eog distributed_algorithm/results/communication_graph/graph.png\end{verbatim}
-
-\textbf{Warning:} This command overwrites  what you may have written
-in your local \verb=distributed_algorithm= directory. So don't modify files in there.\\
-
-If your graph is not connected or too dense you may want to generate another one.
-First change the \verb=config.h -> MIN_RSSI= value. Decreasing the value
-increases connectivity. Then compile, flash and re-run the graph generation (see Sect.~\ref{subsect:edit-compile-flash}).
-
 
 \subsubsection{Commands to edit, compile and flash} \label{subsect:edit-compile-flash}
 
@@ -272,6 +242,41 @@ make -C ../../../build.m3 distributed_algorithm
 \end{verbatim}
 
 \end{itemize}
+
+
+\subsubsection{Generating communication graph}
+
+This creates the communication graph that
+will be used for your experiments. It can be generated \textbf{once and for all} and
+reused across experiments.
+
+\paragraph{On the server}
+
+Run from the \verb=distrubuted_algorithm= directory.
+
+\begin{verbatim}# Generates graph in results/communication_graph/
+~/distributed_algorithm$ ./network_graph_create.py -o results/communication_graph/
+
+~/distributed_algorithm$ ls results/communication_graph
+graph.dot  graph.png  neighbours.csv \end{verbatim}
+
+It generates two important files:
+\texttt{neighbours.csv} which will be used by the algorithms and
+\texttt{graph.png} which is the graphical representation for visualization.
+
+\paragraph{On your computer} Download graph and visualize it:
+\begin{verbatim}
+your_computer:~$ scp -Cr miscitXX@grenoble.iot-lab.info:~/distributed_algorithm/ ~/
+
+eog distributed_algorithm/results/communication_graph/graph.png
+\end{verbatim}
+
+\textbf{Warning:} This command overwrites  what you may have written
+in your local \verb=distributed_algorithm= directory. So don't modify files in there.\\
+
+If your graph is not connected or too dense you may want to generate another one.
+First change the \verb=config.h -> MIN_RSSI= value. Decreasing the value
+increases connectivity. Then compile, flash and re-run the graph generation (see Sect.~\ref{subsect:edit-compile-flash}).
 
 
 \subsection{Running experiments for the exercices}
@@ -313,7 +318,7 @@ You can try the default code with \verb=algo_synchronous.py= a \verb=--num-loop=
 \verb=--outdir= to a directory named \verb=ex_0_test=.
 
 
-\subsection{Download the results}
+\subsection{Downloading the results}
 
 To download the results, open another terminal, on which you are not going to do ssh, just stay on your home directory.
 Type the following command to download the whole project directory:
