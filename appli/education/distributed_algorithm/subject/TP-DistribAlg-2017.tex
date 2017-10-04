@@ -285,7 +285,7 @@ Run your experiment: in a terminal where you are at \\
 \verb=miscitXX@grenoble:~/distributed_algorithm$= \\
 type:
 \begin{verbatim}
-./algo_XXXX.py --num-loop 50 -g results/communication_graph/neighbours.csv \
+./algo_XXXX.py --num-loop 100 -g results/communication_graph/neighbours.csv \
     --outdir results/ex_1/
 \end{verbatim}
 
@@ -420,7 +420,7 @@ To perform average-consensus algorithm, when a sensor $i$ broadcasts its value, 
 \textbf{Algorithm to be implemented:}\\
 Initialize $x$ with some values (the goal is to compute the average of such initial values).
 Run broadcast gossip with the above-described averaging update.\\
-Suggestion: use $30$ nodes and $5000$ iterations, and $\alpha = \frac{1}{2}$.\\
+Suggestion: use $30$ nodes and $2000$ iterations, and $\alpha = \frac{1}{2}$.\\
 
 Read the reminder about theory in Appendix~B, and then do the following analysis.\\
 
