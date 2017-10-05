@@ -81,7 +81,7 @@ Make sure you have completed all tutorials before proceeding.
 
 
 
-\section{Provided files}
+\section{Provided files and how to use them}
 
 For this lab, you are given
 an already-written firmware that allows you to interact with the nodes,
@@ -494,7 +494,7 @@ and it also sets $t_{\text{sys}, \text{up}, j}$ to be the current local system t
 
 The parameters $\alpha$ and $q$ need to be tuned so as to ensure convergence, similarly to the tuning of a PI controller.
 Concerning $q$, it needs to belong to the interval $(0,1)$. For $\alpha$ the tuning is quite delicate: a small value gives slow convergence, so it is interesting to increase it as much as possible, but large values above some threshold lead to instability (there is no convergence at all, the clocks diverge). The theoretical study of such a threshold for $\alpha$ has been performed in the paper \cite{RandSync-journal} for the case where the graph is the complete graph; the result is that the range of $\alpha$ for convergence of the algorithm is $(0, \lambda n (2-q))$, where $\lambda$ is the intensity of the local Poisson clocks, $n$ is the number of nodes, and $q \in (0,1) $ is the other parameter of the algorithm (if you look at the paper, the expression is divided by $f_0$, but in our case $f_0=1$). The problem is that for different graphs the threshold is different and smaller than $\lambda n (2-q)$, and we do not know its value. \\
-Suggestion: use $q=0.5$ and $\alpha = 0.03$; suggested duration of the experiment: 200 seconds.\\
+Suggested parameters: $q=0.5$ and $\alpha = 0.03$; suggested duration of the experiment: 200 seconds.\\
 Time permitting, you can then play around trying other values for $q$ and $\alpha$ and comment on the corresponding results.
 
 
