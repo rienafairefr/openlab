@@ -108,7 +108,7 @@ class NodeResults(object):
         with self.open('neighbours.csv') as neigh:
             print "Neighbours table written to %s" % neigh.name
             for key, values in sorted(self.neighbours.items()):
-                neigh.write('%s:%s\n' % (key, ';'.join(values)))
+                neigh.write('{}:{}\n'.format(key, ';'.join(values)))
 
         # Write 'dot' file
         neighb_graph = self._neighbours_graph()
