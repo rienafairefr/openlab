@@ -343,8 +343,10 @@ def get_node_label(node_uid):
 
 
 def lookup_node_name(node_uid):
-    return lookup_node_name.lookup[node_uid.lower()]
-
+    try:
+        return lookup_node_name.lookup[node_uid.lower()]
+    except:
+        return "m3-???"
 
 def main():
     """ Reads nodes from ressource json in stdin and
