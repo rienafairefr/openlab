@@ -9,7 +9,7 @@ DELAY = 0.05
 
 def broadcast_slow(aggregator, message, delay=DELAY):
     """ Send message to all nodes with 'delay' between sends """
-    for node in aggregator.iterkeys():
+    for node in aggregator.keys():
         aggregator._send(node, message + '\n')
         time.sleep(delay)
     time.sleep(DELAY)
