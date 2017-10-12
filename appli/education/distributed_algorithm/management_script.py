@@ -108,7 +108,7 @@ class NodeResults(object):
         with self.open('neighbours.csv') as neigh:
             print "Neighbours table written to %s" % neigh.name
             for key, values in sorted(self.neighbours.items()):
-                neigh.write('%s:%s\n' % (key, ';'.join(values)))
+                neigh.write('{}:{}\n'.format(key, ';'.join(values)))
 
         # Write 'dot' file
         neighb_graph = self._neighbours_graph()
@@ -307,13 +307,6 @@ def run(algo, opts):
 
     algorithm, handle_result = ALGOS[algo]
 
-    try:
-        opts.with_a8 = False  # HACK for the moment, required by 'select_nodes'
-        opts.nodes_list = serial.SerialAggregator.select_nodes(opts)
-    except (ValueError, RuntimeError) as err:
-        print >> sys.stderr, "Error while calculating nodes list:\n\t%s" % err
-        exit(1)
-
     results = NodeResults(opts.outdir)
 
     handle_result_fct = getattr(results, handle_result)
@@ -343,8 +336,10 @@ def get_node_label(node_uid):
 
 
 def lookup_node_name(node_uid):
-    return lookup_node_name.lookup[node_uid.lower()]
-
+    try:
+        return lookup_node_name.lookup[node_uid.lower()]
+    except:
+        return "m3-???"
 
 def main():
     """ Reads nodes from ressource json in stdin and
