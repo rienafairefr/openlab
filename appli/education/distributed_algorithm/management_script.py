@@ -307,13 +307,6 @@ def run(algo, opts):
 
     algorithm, handle_result = ALGOS[algo]
 
-    try:
-        opts.with_a8 = False  # HACK for the moment, required by 'select_nodes'
-        opts.nodes_list = serial.SerialAggregator.select_nodes(opts)
-    except (ValueError, RuntimeError) as err:
-        print >> sys.stderr, "Error while calculating nodes list:\n\t%s" % err
-        exit(1)
-
     results = NodeResults(opts.outdir)
 
     handle_result_fct = getattr(results, handle_result)
