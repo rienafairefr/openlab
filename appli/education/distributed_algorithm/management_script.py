@@ -12,7 +12,6 @@ import math
 
 from iotlabaggregator import serial
 import iotlabcli
-import iotlabcli.experiment
 
 import algorithm_management as _algos
 import parser as _parser
@@ -311,6 +310,9 @@ def run(algo, opts):
 
     handle_result_fct = getattr(results, handle_result)
 
+    if not opts.nodes_list:
+        opts.nodes_list = get_nodes_list(opts)
+
     # Connect to the nodes
     with serial.SerialAggregator(opts.nodes_list, print_lines=True,
                                  line_handler=results.handle_line) as aggr:
@@ -321,6 +323,12 @@ def run(algo, opts):
 
     # Manage the results
     handle_result_fct()
+
+
+def get_nodes_list(opts):
+    api = iotlabcli.Api(* iotlabcli.get_user_credentials())
+    exp_id = iotlabcli.helpers.get_current_experiment(api, opts.experiment_id)
+    return iotlabcli.parser.common._get_experiment_nodes_list(api, exp_id)
 
 
 def get_node_uids_lookup():
