@@ -52,6 +52,13 @@ void cn_control_start()
     };
     iotlab_serial_register_handler(&handler_set_time);
 
+    // time_sync
+    static iotlab_serial_handler_t handler_time_sync = {
+        .cmd_type = TIME_SYNC,
+        .handler = time_sync,
+    };
+    iotlab_serial_register_handler(&handler_time_sync);
+
     // set_node_id
     static iotlab_serial_handler_t handler_set_node_id = {
         .cmd_type = SET_NODE_ID,
@@ -78,6 +85,33 @@ static struct {
         uint32_t t0;
 } set_time_aux;
 
+
+static int32_t time_sync(uint8_t cmd_type, iotlab_packet_t *packet)
+{
+    packet_t *pkt = (packet_t *)packet;
+    if (8 != pkt->length)
+        return 1;
+    // time the packet was received
+    struct soft_timer_timeval timestamp;
+    iotlab_time_extend_relative(&timestamp, soft_timer_time());
+
+    /* copy T1 */
+    memcpy(&set_time_aux.unix_time, pkt->data, pkt->length);
+
+    /* alloc the ack frame */
+    iotlab_packet_t *ack_pkt = iotlab_serial_packet_alloc(&cn_control.acks_queue);
+    if (!ack_pkt)
+        return 1;
+    ((packet_t *)ack_pkt)->data[0] = TIME_SYNC;
+    ((packet_t *)ack_pkt)->length = 9;
+
+    if (event_post(EVENT_QUEUE_APPLI, do_set_time, ack_pkt)) {
+        iotlab_packet_call_free(ack_pkt);
+        return 1;
+    }
+
+    return 0;
+}
 
 static int32_t set_time(uint8_t cmd_type, iotlab_packet_t *packet)
 {
