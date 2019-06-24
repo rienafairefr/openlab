@@ -50,14 +50,14 @@ void iotlab_i2c_slave_register_timestamp_fct(
 
 void iotlab_i2c_slave_start()
 {
-    i2c_enable(I2C_2, I2C_CLOCK_MODE_FAST);
-    i2c_slave_set_address(I2C_2, IOTLAB_I2C_CN_ADDR);
-    i2c_slave_configure(I2C_2, i2c_slave_handler);
+    i2c_enable(I2C_1, I2C_CLOCK_MODE_FAST);
+    i2c_slave_set_address(I2C_1, IOTLAB_I2C_CN_ADDR);
+    i2c_slave_configure(I2C_1, i2c_slave_handler);
 }
 
 void iotlab_i2c_slave_stop()
 {
-    i2c_disable(I2C_2);
+    i2c_disable(I2C_1);
     _state.handlers_list.next = NULL;  // remove handlers
 }
 

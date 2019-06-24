@@ -9,6 +9,7 @@ add_subdirectory(idle_with_dc)
 
 add_subdirectory(node_radio_characterization)
 add_subdirectory(radio_test)
+add_subdirectory(i2c_clock)
 
 # Libraries
 add_subdirectory(autotest_common)
