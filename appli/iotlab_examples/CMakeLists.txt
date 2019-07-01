@@ -4,6 +4,7 @@ add_subdirectory(serial_helo)
 add_subdirectory(simple_robot)
 add_subdirectory(print_uids)
 add_subdirectory(gps_synced_sniffer)
+add_subdirectory(ewsn_comp)
 add_subdirectory(leds_chaser)
 add_subdirectory(embers_sensors)
 

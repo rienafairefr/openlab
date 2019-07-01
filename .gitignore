@@ -9,3 +9,5 @@ cscope.*
 *.*#
 *build*
 *pyc
+
+\.idea/
