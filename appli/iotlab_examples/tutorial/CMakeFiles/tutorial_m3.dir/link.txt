@@ -1,0 +1,1 @@
+/usr/bin/cc     CMakeFiles/tutorial_m3.dir/main.o  -o tutorial_m3 -rdynamic -lplatform -llps331ap -lisl29020 -liotlab_uid_num_table -liotlab_i2c -lmac_csma 

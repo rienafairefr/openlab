@@ -10,6 +10,8 @@
 
 #include "debug.h"
 
+#define LOG_LEVEL LOG_LEVEL_DEBUG
+
 void get_timestamp(struct soft_timer_timeval *time)
 {
     time->tv_sec = 0;
@@ -73,6 +75,7 @@ void cn_i2c_start()
 
     iotlab_i2c_slave_register_timestamp_fct(get_timestamp);
     iotlab_i2c_slave_start();
+    log_info("I2C slave started");
 }
 
 void cn_i2c_stop()

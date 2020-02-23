@@ -1,0 +1,42 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/matthieu/openlab/appli/iotlab_examples/tutorial/main.c
+platform.h
+-
+stdint.h
+-
+stdlib.h
+-
+printf.h
+-
+string.h
+-
+time.h
+-
+phy.h
+/home/matthieu/openlab/appli/iotlab_examples/tutorial/phy.h
+soft_timer.h
+/home/matthieu/openlab/appli/iotlab_examples/tutorial/soft_timer.h
+event.h
+/home/matthieu/openlab/appli/iotlab_examples/tutorial/event.h
+lps331ap.h
+/home/matthieu/openlab/appli/iotlab_examples/tutorial/lps331ap.h
+isl29020.h
+/home/matthieu/openlab/appli/iotlab_examples/tutorial/isl29020.h
+iotlab_uid.h
+/home/matthieu/openlab/appli/iotlab_examples/tutorial/iotlab_uid.h
+mac_csma.h
+/home/matthieu/openlab/appli/iotlab_examples/tutorial/mac_csma.h
+phy.h
+/home/matthieu/openlab/appli/iotlab_examples/tutorial/phy.h
+iotlab_i2c.h
+/home/matthieu/openlab/appli/iotlab_examples/tutorial/iotlab_i2c.h
+iotlab_uid_num_hashtable.h
+/home/matthieu/openlab/appli/iotlab_examples/tutorial/iotlab_uid_num_hashtable.h
+

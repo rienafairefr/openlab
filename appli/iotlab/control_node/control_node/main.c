@@ -42,11 +42,11 @@ int main()
     cn_control_start();
 
 #ifdef IOTLAB_CN
-    cn_alim_start();
-    cn_consumption_start();
+    // cn_alim_start();
+    // cn_consumption_start();
     /* map i2c start stop to dc start/stop */
     cn_alim_config(cn_i2c_stop, cn_i2c_start);
-    cn_autotest_start();
+    //cn_autotest_start();
 #endif
 
     cn_radio_start();
@@ -54,8 +54,8 @@ int main()
 
 #ifdef IOTLAB_CN
     //set the open node power to off and disable battery charge
-    fiteco_lib_gwt_opennode_power_select(FITECO_GWT_OPENNODE_POWER__OFF);
-    fiteco_lib_gwt_battery_charge_disable();
+    //fiteco_lib_gwt_opennode_power_select(FITECO_GWT_OPENNODE_POWER__OFF);
+    //fiteco_lib_gwt_battery_charge_disable();
 #endif
 
     //initialize the led, red off, green on
